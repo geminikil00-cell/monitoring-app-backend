@@ -6,7 +6,8 @@ sys.path.append(os.getcwd())
 
 from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
-from app.db import crud, models, schemas
+from app.db import crud, models
+from app.api.v1 import schemas
 from app.core import security
 
 def create_admin_user(email, password):
