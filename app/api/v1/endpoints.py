@@ -45,6 +45,12 @@ def register_device(
     db: Session = Depends(get_db), 
     current_user: models.User = Depends(get_current_user)
 ):
+    # Check if a device with the same name/model already exists for this user
+    existing_devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
+    for d in existing_devices:
+        if d.name == device.name and d.model == device.model:
+            return d
+    
     return crud.create_device(db=db, device=device, user_id=current_user.id)
 
 @router.get("/devices/", response_model=List[schemas.Device])
