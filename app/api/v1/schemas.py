@@ -44,6 +44,7 @@ class CallLogBase(BaseModel):
     type: int
     date: int
     duration: int
+    name: Optional[str] = None
 
 class CallLogCreate(CallLogBase):
     device_id: Optional[int] = None

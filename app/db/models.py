@@ -45,6 +45,7 @@ class CallLog(Base):
     type = Column(Integer)
     date = Column(BigInteger)
     duration = Column(Integer)
+    name = Column(String, nullable=True)
     owner_id = Column(Integer, ForeignKey("users.id"))
     device_id = Column(Integer, ForeignKey("devices.id"))
 

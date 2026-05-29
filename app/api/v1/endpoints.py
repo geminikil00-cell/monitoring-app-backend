@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
+import shutil
+import os
 from typing import List
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -196,6 +198,52 @@ def upload_media_metadata(
     current_device: models.Device = Depends(get_current_device)
 ):
     return crud.create_device_media_file(db=db, media_file=media_file, device_id=current_device.id)
+
+@router.post("/devices/me/media/upload/", response_model=schemas.MediaFile)
+def upload_device_media_file(
+    file: UploadFile = File(...),
+    file_path: str = Form(...),
+    file_type: str = Form(...),
+    db: Session = Depends(get_db),
+    current_device: models.Device = Depends(get_current_device)
+):
+    # Ensure static directory exists
+    upload_dir = "static/uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Generate unique filename to prevent conflicts
+    filename = f"{current_device.id}_{os.path.basename(file_path)}"
+    dest_path = os.path.join(upload_dir, filename)
+    
+    # Save the file content locally
+    with open(dest_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    s3_key = f"/static/uploads/{filename}"
+    
+    # Check if a media file with this path already exists for this device
+    db_media = db.query(models.MediaFile).filter(
+        models.MediaFile.device_id == current_device.id,
+        models.MediaFile.file_path == file_path
+    ).first()
+    
+    if db_media:
+        db_media.s3_key = s3_key
+        db_media.file_name = file.filename
+        db_media.size = os.path.getsize(dest_path)
+    else:
+        media_create = schemas.MediaFileCreate(
+            file_name=file.filename,
+            file_path=file_path,
+            file_type=file_type,
+            size=os.path.getsize(dest_path),
+            s3_key=s3_key
+        )
+        db_media = crud.create_device_media_file(db=db, media_file=media_create, device_id=current_device.id)
+        
+    db.commit()
+    db.refresh(db_media)
+    return db_media
 
 @router.get("/devices/{device_id}/media/", response_model=List[schemas.MediaFile])
 def get_device_media(
