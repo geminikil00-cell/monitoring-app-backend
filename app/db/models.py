@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, BigInteger
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
@@ -43,7 +43,7 @@ class CallLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     number = Column(String, index=True)
     type = Column(Integer)
-    date = Column(Integer)
+    date = Column(BigInteger)
     duration = Column(Integer)
     owner_id = Column(Integer, ForeignKey("users.id"))
     device_id = Column(Integer, ForeignKey("devices.id"))
@@ -57,7 +57,7 @@ class SmsMessage(Base):
     id = Column(Integer, primary_key=True, index=True)
     address = Column(String, index=True)
     body = Column(String)
-    date = Column(Integer)
+    date = Column(BigInteger)
     owner_id = Column(Integer, ForeignKey("users.id"))
     device_id = Column(Integer, ForeignKey("devices.id"))
 
@@ -71,7 +71,7 @@ class AppUsage(Base):
     app_name = Column(String, index=True)
     package_name = Column(String)
     duration = Column(Integer) # in seconds
-    date = Column(Integer)
+    date = Column(BigInteger)
     owner_id = Column(Integer, ForeignKey("users.id"))
     device_id = Column(Integer, ForeignKey("devices.id"))
 
@@ -84,7 +84,7 @@ class WebActivity(Base):
     id = Column(Integer, primary_key=True, index=True)
     url = Column(String, index=True)
     title = Column(String)
-    visit_time = Column(Integer)
+    visit_time = Column(BigInteger)
     owner_id = Column(Integer, ForeignKey("users.id"))
     device_id = Column(Integer, ForeignKey("devices.id"))
 
@@ -97,7 +97,7 @@ class InstalledApp(Base):
     id = Column(Integer, primary_key=True, index=True)
     app_name = Column(String, index=True)
     package_name = Column(String)
-    install_date = Column(Integer)
+    install_date = Column(BigInteger)
     owner_id = Column(Integer, ForeignKey("users.id"))
     device_id = Column(Integer, ForeignKey("devices.id"))
 
@@ -111,7 +111,7 @@ class Notification(Base):
     package_name = Column(String, index=True)
     title = Column(String)
     text = Column(String)
-    post_time = Column(Integer)
+    post_time = Column(BigInteger)
     owner_id = Column(Integer, ForeignKey("users.id"))
     device_id = Column(Integer, ForeignKey("devices.id"))
 
@@ -124,7 +124,7 @@ class Location(Base):
     id = Column(Integer, primary_key=True, index=True)
     latitude = Column(String)
     longitude = Column(String)
-    timestamp = Column(Integer)
+    timestamp = Column(BigInteger)
     owner_id = Column(Integer, ForeignKey("users.id"))
     device_id = Column(Integer, ForeignKey("devices.id"))
 
