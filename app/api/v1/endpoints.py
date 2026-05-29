@@ -154,6 +154,62 @@ def read_locations_for_user(
 ):
     return crud.get_locations_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
+# Command Endpoints
+@router.post("/devices/{device_id}/commands/", response_model=schemas.Command)
+def create_command(
+    device_id: int,
+    command: schemas.CommandCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Verify device belongs to user
+    devices = crud.get_devices_by_user(db, current_user.id)
+    if not any(d.id == device_id for d in devices):
+        raise HTTPException(status_code=403, detail="Device not found or access denied")
+    return crud.create_device_command(db=db, command=command, device_id=device_id)
+
+@router.get("/devices/me/commands/", response_model=List[schemas.Command])
+def get_commands_for_device(
+    db: Session = Depends(get_db),
+    current_device: models.Device = Depends(get_current_device)
+):
+    commands = crud.get_pending_commands(db, current_device.id)
+    # Mark as SENT immediately
+    for cmd in commands:
+        crud.update_command_status(db, cmd.id, "SENT")
+    return commands
+
+@router.patch("/commands/{command_id}/status")
+def update_command_status(
+    command_id: int,
+    status: str,
+    db: Session = Depends(get_db),
+    current_device: models.Device = Depends(get_current_device)
+):
+    return crud.update_command_status(db, command_id, status)
+
+# MediaFile Endpoints
+@router.post("/devices/me/media/", response_model=schemas.MediaFile)
+def upload_media_metadata(
+    media_file: schemas.MediaFileCreate,
+    db: Session = Depends(get_db),
+    current_device: models.Device = Depends(get_current_device)
+):
+    return crud.create_device_media_file(db=db, media_file=media_file, device_id=current_device.id)
+
+@router.get("/devices/{device_id}/media/", response_model=List[schemas.MediaFile])
+def get_device_media(
+    device_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    devices = crud.get_devices_by_user(db, current_user.id)
+    if not any(d.id == device_id for d in devices):
+        raise HTTPException(status_code=403, detail="Device not found or access denied")
+    return crud.get_media_files_by_device(db, device_id, skip, limit)
+
 # Device Telemetry Endpoints
 @router.post("/devices/me/call_logs/", response_model=schemas.CallLog)
 def create_call_log_for_device(

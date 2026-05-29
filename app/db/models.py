@@ -130,3 +130,28 @@ class Location(Base):
 
     owner = relationship("User", back_populates="locations")
     device = relationship("Device", back_populates="locations")
+
+class Command(Base):
+    __tablename__ = "commands"
+
+    id = Column(Integer, primary_key=True, index=True)
+    command_type = Column(String) # e.g., "SCREENSHOT", "LIVE_MIC", "DOWNLOAD_FILE"
+    payload = Column(String, nullable=True) # e.g., JSON with file path
+    status = Column(String, default="PENDING") # PENDING, SENT, COMPLETED, FAILED
+    created_at = Column(DateTime(timezone=True), default=func.now())
+    device_id = Column(Integer, ForeignKey("devices.id"))
+
+    device = relationship("Device")
+
+class MediaFile(Base):
+    __tablename__ = "media_files"
+
+    id = Column(Integer, primary_key=True, index=True)
+    file_name = Column(String)
+    file_path = Column(String)
+    file_type = Column(String) # IMAGE, VIDEO, DOCUMENT
+    size = Column(Integer)
+    s3_key = Column(String, nullable=True)
+    device_id = Column(Integer, ForeignKey("devices.id"))
+
+    device = relationship("Device")
