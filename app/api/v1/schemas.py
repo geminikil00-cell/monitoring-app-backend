@@ -105,6 +105,39 @@ class WebActivity(WebActivityBase):
     class Config:
         from_attributes = True
 
+class InstalledAppBase(BaseModel):
+    app_name: str
+    package_name: str
+    install_date: int
+
+class InstalledAppCreate(InstalledAppBase):
+    device_id: Optional[int] = None
+
+class InstalledApp(InstalledAppBase):
+    id: int
+    owner_id: int
+    device_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+class NotificationBase(BaseModel):
+    package_name: str
+    title: str
+    text: str
+    post_time: int
+
+class NotificationCreate(NotificationBase):
+    device_id: Optional[int] = None
+
+class Notification(NotificationBase):
+    id: int
+    owner_id: int
+    device_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
 class LocationBase(BaseModel):
     latitude: str
     longitude: str

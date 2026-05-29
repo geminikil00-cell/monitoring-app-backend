@@ -94,6 +94,32 @@ def get_web_activity_by_user(db: Session, user_id: int, skip: int = 0, limit: in
 def get_web_activity_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
     return db.query(models.WebActivity).filter(models.WebActivity.device_id == device_id).offset(skip).limit(limit).all()
 
+def create_user_installed_app(db: Session, installed_app: schemas.InstalledAppCreate, user_id: int):
+    db_installed_app = models.InstalledApp(**installed_app.dict(), owner_id=user_id)
+    db.add(db_installed_app)
+    db.commit()
+    db.refresh(db_installed_app)
+    return db_installed_app
+
+def get_installed_apps_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 100):
+    return db.query(models.InstalledApp).filter(models.InstalledApp.owner_id == user_id).offset(skip).limit(limit).all()
+
+def get_installed_apps_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
+    return db.query(models.InstalledApp).filter(models.InstalledApp.device_id == device_id).offset(skip).limit(limit).all()
+
+def create_user_notification(db: Session, notification: schemas.NotificationCreate, user_id: int):
+    db_notification = models.Notification(**notification.dict(), owner_id=user_id)
+    db.add(db_notification)
+    db.commit()
+    db.refresh(db_notification)
+    return db_notification
+
+def get_notifications_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 100):
+    return db.query(models.Notification).filter(models.Notification.owner_id == user_id).order_by(models.Notification.post_time.desc()).offset(skip).limit(limit).all()
+
+def get_notifications_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
+    return db.query(models.Notification).filter(models.Notification.device_id == device_id).order_by(models.Notification.post_time.desc()).offset(skip).limit(limit).all()
+
 def create_user_location(db: Session, location: schemas.LocationCreate, user_id: int):
     db_location = models.Location(**location.dict(), owner_id=user_id)
     db.add(db_location)

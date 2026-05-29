@@ -118,6 +118,30 @@ def read_web_activity_for_user(
 ):
     return crud.get_web_activity_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
+@router.post("/users/me/installed_apps/", response_model=schemas.InstalledApp)
+def create_installed_app_for_user(
+    installed_app: schemas.InstalledAppCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+):
+    return crud.create_user_installed_app(db=db, installed_app=installed_app, user_id=current_user.id)
+
+@router.get("/users/me/installed_apps/", response_model=List[schemas.InstalledApp])
+def read_installed_apps_for_user(
+    skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_installed_apps_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
+
+@router.post("/users/me/notifications/", response_model=schemas.Notification)
+def create_notification_for_user(
+    notification: schemas.NotificationCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+):
+    return crud.create_user_notification(db=db, notification=notification, user_id=current_user.id)
+
+@router.get("/users/me/notifications/", response_model=List[schemas.Notification])
+def read_notifications_for_user(
+    skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_notifications_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
+
 @router.post("/users/me/locations/", response_model=schemas.Location)
 def create_location_for_user(
     location: schemas.LocationCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
@@ -166,6 +190,24 @@ def create_web_activity_for_device(
 ):
     web_activity.device_id = current_device.id
     return crud.create_user_web_activity(db=db, web_activity=web_activity, user_id=current_device.owner_id)
+
+@router.post("/devices/me/installed_apps/", response_model=schemas.InstalledApp)
+def create_installed_app_for_device(
+    installed_app: schemas.InstalledAppCreate, 
+    db: Session = Depends(get_db), 
+    current_device: models.Device = Depends(get_current_device)
+):
+    installed_app.device_id = current_device.id
+    return crud.create_user_installed_app(db=db, installed_app=installed_app, user_id=current_device.owner_id)
+
+@router.post("/devices/me/notifications/", response_model=schemas.Notification)
+def create_notification_for_device(
+    notification: schemas.NotificationCreate, 
+    db: Session = Depends(get_db), 
+    current_device: models.Device = Depends(get_current_device)
+):
+    notification.device_id = current_device.id
+    return crud.create_user_notification(db=db, notification=notification, user_id=current_device.owner_id)
 
 @router.post("/devices/me/locations/", response_model=schemas.Location)
 def create_location_for_device(

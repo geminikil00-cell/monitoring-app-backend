@@ -91,6 +91,33 @@ class WebActivity(Base):
     owner = relationship("User", back_populates="web_activity")
     device = relationship("Device", back_populates="web_activity")
 
+class InstalledApp(Base):
+    __tablename__ = "installed_apps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    app_name = Column(String, index=True)
+    package_name = Column(String)
+    install_date = Column(Integer)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    device_id = Column(Integer, ForeignKey("devices.id"))
+
+    owner = relationship("User")
+    device = relationship("Device")
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    package_name = Column(String, index=True)
+    title = Column(String)
+    text = Column(String)
+    post_time = Column(Integer)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+    device_id = Column(Integer, ForeignKey("devices.id"))
+
+    owner = relationship("User")
+    device = relationship("Device")
+
 class Location(Base):
     __tablename__ = "locations"
 
