@@ -69,10 +69,8 @@ def get_sms_messages_by_device(db: Session, device_id: int, skip: int = 0, limit
     return db.query(models.SmsMessage).filter(models.SmsMessage.device_id == device_id).offset(skip).limit(limit).all()
 
 def create_user_app_usage(db: Session, app_usage: schemas.AppUsageCreate, user_id: int):
-    # Round timestamp to start of today in milliseconds
-    # 86400000 ms in a day
     midnight = (app_usage.date // 86400000) * 86400000
-    
+
     db_app_usage = db.query(models.AppUsage).filter(
         models.AppUsage.owner_id == user_id,
         models.AppUsage.device_id == app_usage.device_id,
@@ -80,7 +78,7 @@ def create_user_app_usage(db: Session, app_usage: schemas.AppUsageCreate, user_i
         models.AppUsage.date >= midnight,
         models.AppUsage.date < midnight + 86400000
     ).first()
-    
+
     if db_app_usage:
         if app_usage.duration > db_app_usage.duration:
             db_app_usage.duration = app_usage.duration
@@ -88,7 +86,7 @@ def create_user_app_usage(db: Session, app_usage: schemas.AppUsageCreate, user_i
     else:
         db_app_usage = models.AppUsage(**app_usage.dict(), owner_id=user_id)
         db.add(db_app_usage)
-        
+
     db.commit()
     db.refresh(db_app_usage)
     return db_app_usage
@@ -118,14 +116,14 @@ def create_user_installed_app(db: Session, installed_app: schemas.InstalledAppCr
         models.InstalledApp.device_id == installed_app.device_id,
         models.InstalledApp.package_name == installed_app.package_name
     ).first()
-    
+
     if db_installed_app:
         db_installed_app.app_name = installed_app.app_name
         db_installed_app.install_date = installed_app.install_date
     else:
         db_installed_app = models.InstalledApp(**installed_app.dict(), owner_id=user_id)
         db.add(db_installed_app)
-        
+
     db.commit()
     db.refresh(db_installed_app)
     return db_installed_app
@@ -161,36 +159,3 @@ def get_locations_by_user(db: Session, user_id: int, skip: int = 0, limit: int =
 
 def get_locations_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
     return db.query(models.Location).filter(models.Location.device_id == device_id).order_by(models.Location.timestamp.desc()).offset(skip).limit(limit).all()
-
-# Command CRUD
-def create_device_command(db: Session, command: schemas.CommandCreate, device_id: int):
-    db_command = models.Command(**command.dict(), device_id=device_id)
-    db.add(db_command)
-    db.commit()
-    db.refresh(db_command)
-    return db_command
-
-def get_pending_commands(db: Session, device_id: int):
-    return db.query(models.Command).filter(
-        models.Command.device_id == device_id, 
-        models.Command.status == "PENDING"
-    ).all()
-
-def update_command_status(db: Session, command_id: int, status: str):
-    db_command = db.query(models.Command).filter(models.Command.id == command_id).first()
-    if db_command:
-        db_command.status = status
-        db.commit()
-        db.refresh(db_command)
-    return db_command
-
-# MediaFile CRUD
-def create_device_media_file(db: Session, media_file: schemas.MediaFileCreate, device_id: int):
-    db_media = models.MediaFile(**media_file.dict(), device_id=device_id)
-    db.add(db_media)
-    db.commit()
-    db.refresh(db_media)
-    return db_media
-
-def get_media_files_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.MediaFile).filter(models.MediaFile.device_id == device_id).offset(skip).limit(limit).all()
