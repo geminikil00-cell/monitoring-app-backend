@@ -175,14 +175,17 @@ class MediaFileBase(BaseModel):
     file_name: str
     file_path: str
     file_type: str
+    category: Optional[str] = None
     size: int
 
 class MediaFileCreate(MediaFileBase):
     s3_key: Optional[str] = None
+    thumbnail_key: Optional[str] = None
 
 class MediaFile(MediaFileBase):
     id: int
     s3_key: Optional[str] = None
+    thumbnail_key: Optional[str] = None
     device_id: int
 
     class Config:

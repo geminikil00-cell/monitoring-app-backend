@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
 import shutil
 import os
-from typing import List
+import uuid
+from typing import List, Optional
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from . import schemas
@@ -11,6 +12,9 @@ from app.core import security
 from app.core.auth import get_current_user, get_current_device
 from datetime import timedelta
 from app.core.config import settings
+from sqlalchemy.sql import func
+from PIL import Image
+import io
 
 router = APIRouter()
 
@@ -216,43 +220,67 @@ def upload_device_media_file(
     file: UploadFile = File(...),
     file_path: str = Form(...),
     file_type: str = Form(...),
+    category: str = Form(None),
     db: Session = Depends(get_db),
     current_device: models.Device = Depends(get_current_device)
 ):
     # Ensure static directory exists
     upload_dir = "static/uploads"
+    thumb_dir = "static/thumbnails"
     os.makedirs(upload_dir, exist_ok=True)
-    
+    os.makedirs(thumb_dir, exist_ok=True)
+
     # Generate unique filename to prevent conflicts
-    filename = f"{current_device.id}_{os.path.basename(file_path)}"
+    safe_name = os.path.basename(file_path).replace(" ", "_")
+    filename = f"{current_device.id}_{int(func.now().params['now'].timestamp())}_{safe_name}" if hasattr(func.now(), 'params') else f"{current_device.id}_{uuid.uuid4().hex}_{safe_name}"
+    # Simplified filename for now to avoid complexity with func.now() execution here
+    filename = f"{current_device.id}_{uuid.uuid4().hex}_{safe_name}"
     dest_path = os.path.join(upload_dir, filename)
-    
+
     # Save the file content locally
     with open(dest_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-        
+
     s3_key = f"/static/uploads/{filename}"
-    
+    thumbnail_key = None
+
+    # Generate thumbnail for images
+    if file_type == "IMAGE" or file.content_type.startswith("image/"):
+        try:
+            with Image.open(dest_path) as img:
+                # Create a small thumbnail (e.g., 200x200)
+                img.thumbnail((200, 200))
+                thumb_filename = f"thumb_{filename}"
+                thumb_path = os.path.join(thumb_dir, thumb_filename)
+                img.save(thumb_path)
+                thumbnail_key = f"/static/thumbnails/{thumb_filename}"
+        except Exception as e:
+            print(f"Error generating thumbnail: {e}")
+
     # Check if a media file with this path already exists for this device
     db_media = db.query(models.MediaFile).filter(
         models.MediaFile.device_id == current_device.id,
         models.MediaFile.file_path == file_path
     ).first()
-    
+
     if db_media:
         db_media.s3_key = s3_key
+        db_media.thumbnail_key = thumbnail_key
         db_media.file_name = file.filename
         db_media.size = os.path.getsize(dest_path)
+        db_media.category = category
     else:
         media_create = schemas.MediaFileCreate(
             file_name=file.filename,
             file_path=file_path,
             file_type=file_type,
+            category=category,
             size=os.path.getsize(dest_path),
-            s3_key=s3_key
+            s3_key=s3_key,
+            thumbnail_key=thumbnail_key
         )
         db_media = crud.create_device_media_file(db=db, media_file=media_create, device_id=current_device.id)
-        
+
     db.commit()
     db.refresh(db_media)
     return db_media
@@ -261,15 +289,20 @@ def upload_device_media_file(
 def get_device_media(
     device_id: int,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 1000,
+    category: str = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
     devices = crud.get_devices_by_user(db, current_user.id)
     if not any(d.id == device_id for d in devices):
         raise HTTPException(status_code=403, detail="Device not found or access denied")
-    return crud.get_media_files_by_device(db, device_id, skip, limit)
 
+    query = db.query(models.MediaFile).filter(models.MediaFile.device_id == device_id)
+    if category:
+        query = query.filter(models.MediaFile.category == category)
+
+    return query.order_by(models.MediaFile.id.desc()).offset(skip).limit(limit).all()
 # Device Telemetry Endpoints
 @router.post("/devices/me/call_logs/", response_model=schemas.CallLog)
 def create_call_log_for_device(

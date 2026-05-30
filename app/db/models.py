@@ -151,8 +151,10 @@ class MediaFile(Base):
     file_name = Column(String)
     file_path = Column(String)
     file_type = Column(String) # IMAGE, VIDEO, DOCUMENT
+    category = Column(String, nullable=True) # e.g., "Camera", "WhatsApp", "Screenshots"
     size = Column(Integer)
     s3_key = Column(String, nullable=True)
+    thumbnail_key = Column(String, nullable=True)
     device_id = Column(Integer, ForeignKey("devices.id"))
 
     device = relationship("Device")
