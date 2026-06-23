@@ -154,3 +154,34 @@ class Location(LocationBase):
 
     class Config:
         from_attributes = True
+
+class CommandBase(BaseModel):
+    command_type: str
+    payload: Optional[str] = None
+
+class CommandCreate(CommandBase):
+    device_id: int
+
+class CommandStatusUpdate(BaseModel):
+    status: str
+    result: Optional[str] = None
+
+class Command(CommandBase):
+    id: int
+    status: str
+    result: Optional[str] = None
+    device_id: int
+    class Config: from_attributes = True
+
+class MediaFileBase(BaseModel):
+    s3_key: str
+    file_type: str
+
+class MediaFileCreate(MediaFileBase):
+    device_id: int
+
+class MediaFile(MediaFileBase):
+    id: int
+    device_id: int
+    class Config: from_attributes = True
+

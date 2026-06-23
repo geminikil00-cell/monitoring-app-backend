@@ -1,17 +1,15 @@
 from sqlalchemy.orm import Session
 from . import models
 from app.api.v1 import schemas
-from passlib.context import CryptContext
+from app.core import security
 import uuid
 from sqlalchemy.sql import func
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
 
 def create_user(db: Session, user: schemas.UserCreate):
-    hashed_password = pwd_context.hash(user.password)
+    hashed_password = security.get_password_hash(user.password)
     db_user = models.User(email=user.email, hashed_password=hashed_password)
     db.add(db_user)
     db.commit()
@@ -159,3 +157,33 @@ def get_locations_by_user(db: Session, user_id: int, skip: int = 0, limit: int =
 
 def get_locations_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
     return db.query(models.Location).filter(models.Location.device_id == device_id).order_by(models.Location.timestamp.desc()).offset(skip).limit(limit).all()
+
+def create_command(db: Session, command: schemas.CommandCreate, user_id: int):
+    db_command = models.Command(**command.dict(), owner_id=user_id)
+    db.add(db_command)
+    db.commit()
+    db.refresh(db_command)
+    return db_command
+
+def get_pending_commands_by_device(db: Session, device_id: int):
+    return db.query(models.Command).filter(models.Command.device_id == device_id, models.Command.status == "pending").all()
+
+def update_command_status(db: Session, command_id: int, update: schemas.CommandStatusUpdate):
+    db_cmd = db.query(models.Command).filter(models.Command.id == command_id).first()
+    if db_cmd:
+        db_cmd.status = update.status
+        if update.result: db_cmd.result = update.result
+        db.commit()
+        db.refresh(db_cmd)
+    return db_cmd
+
+def create_media_file(db: Session, media: schemas.MediaFileCreate, user_id: int):
+    db_media = models.MediaFile(**media.dict(), owner_id=user_id)
+    db.add(db_media)
+    db.commit()
+    db.refresh(db_media)
+    return db_media
+
+def get_media_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
+    return db.query(models.MediaFile).filter(models.MediaFile.device_id == device_id).offset(skip).limit(limit).all()
+

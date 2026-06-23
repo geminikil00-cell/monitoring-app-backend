@@ -43,6 +43,24 @@ def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
 # Device Endpoints
+@router.delete("/devices/{device_id}")
+def delete_device(device_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_device = db.query(models.Device).filter(models.Device.id == device_id, models.Device.owner_id == current_user.id).first()
+    if not db_device: raise HTTPException(status_code=404, detail="Device not found")
+    db.delete(db_device)
+    db.commit()
+    return {"detail": "Device deleted"}
+
+@router.get("/devices/{device_id}", response_model=schemas.Device)
+def read_device(device_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_device = db.query(models.Device).filter(models.Device.id == device_id, models.Device.owner_id == current_user.id).first()
+    if not db_device: raise HTTPException(status_code=404, detail="Device not found")
+    return db_device
+
+@router.get("/devices/me/", response_model=schemas.Device)
+def read_device_me(current_device: models.Device = Depends(get_current_device)):
+    return current_device
+
 @router.post("/devices/register", response_model=schemas.Device)
 def register_device(
     device: schemas.DeviceCreate,
@@ -52,7 +70,7 @@ def register_device(
     # Check if a device with the same name/model already exists for this user
     existing_devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
     for d in existing_devices:
-        if d.name == device.name and d.model == device.model:
+        if device.name and device.model and d.name == device.name and d.model == device.model:
             return d
 
     return crud.create_device(db=db, device=device, user_id=current_user.id)
@@ -66,17 +84,20 @@ def read_devices(
 
 @router.patch("/devices/heartbeat", response_model=schemas.Device)
 def device_heartbeat(
-    battery_level: int,
+    update: schemas.DeviceUpdate,
     db: Session = Depends(get_db),
     current_device: models.Device = Depends(get_current_device)
 ):
-    return crud.update_device_heartbeat(db=db, device_id=current_device.id, battery_level=battery_level)
+    return crud.update_device_heartbeat(db=db, device_id=current_device.id, battery_level=update.battery_level)
 
 @router.get("/users/me/call_logs/", response_model=List[schemas.CallLog])
 def read_call_logs_for_user(
     device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
     if device_id:
+        devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
+        if not any(d.id == device_id for d in devices):
+            raise HTTPException(status_code=403, detail="Device not owned by user")
         return crud.get_call_logs_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
     return crud.get_call_logs_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
@@ -85,6 +106,9 @@ def read_sms_messages_for_user(
     device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
     if device_id:
+        devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
+        if not any(d.id == device_id for d in devices):
+            raise HTTPException(status_code=403, detail="Device not owned by user")
         return crud.get_sms_messages_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
     return crud.get_sms_messages_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
@@ -93,6 +117,9 @@ def read_app_usage_for_user(
     device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
     if device_id:
+        devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
+        if not any(d.id == device_id for d in devices):
+            raise HTTPException(status_code=403, detail="Device not owned by user")
         return crud.get_app_usage_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
     return crud.get_app_usage_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
@@ -101,6 +128,9 @@ def read_web_activity_for_user(
     device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
     if device_id:
+        devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
+        if not any(d.id == device_id for d in devices):
+            raise HTTPException(status_code=403, detail="Device not owned by user")
         return crud.get_web_activity_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
     return crud.get_web_activity_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
@@ -109,6 +139,9 @@ def read_installed_apps_for_user(
     device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
     if device_id:
+        devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
+        if not any(d.id == device_id for d in devices):
+            raise HTTPException(status_code=403, detail="Device not owned by user")
         return crud.get_installed_apps_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
     return crud.get_installed_apps_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
@@ -117,6 +150,9 @@ def read_notifications_for_user(
     device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
     if device_id:
+        devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
+        if not any(d.id == device_id for d in devices):
+            raise HTTPException(status_code=403, detail="Device not owned by user")
         return crud.get_notifications_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
     return crud.get_notifications_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
@@ -125,6 +161,9 @@ def read_locations_for_user(
     device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
     if device_id:
+        devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
+        if not any(d.id == device_id for d in devices):
+            raise HTTPException(status_code=403, detail="Device not owned by user")
         return crud.get_locations_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
     return crud.get_locations_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
@@ -191,3 +230,31 @@ def create_location_for_device(
 ):
     location.device_id = current_device.id
     return crud.create_user_location(db=db, location=location, user_id=current_device.owner_id)
+
+@router.get("/devices/me/commands/", response_model=List[schemas.Command])
+def get_device_commands(db: Session = Depends(get_db), current_device: models.Device = Depends(get_current_device)):
+    return crud.get_pending_commands_by_device(db=db, device_id=current_device.id)
+
+@router.patch("/commands/{command_id}/status", response_model=schemas.Command)
+def update_command_status(command_id: int, update: schemas.CommandStatusUpdate, db: Session = Depends(get_db), current_device: models.Device = Depends(get_current_device)):
+    return crud.update_command_status(db=db, command_id=command_id, update=update)
+
+@router.post("/devices/me/media/upload/", response_model=schemas.MediaFile)
+def upload_media(file: UploadFile = File(...), db: Session = Depends(get_db), current_device: models.Device = Depends(get_current_device)):
+    # fake upload
+    filename = f"{uuid.uuid4()}_{file.filename}"
+    file_path = os.path.join("static", filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    media = schemas.MediaFileCreate(s3_key=filename, file_type=file.content_type, device_id=current_device.id)
+    return crud.create_media_file(db=db, media=media, user_id=current_device.owner_id)
+
+@router.post("/devices/{device_id}/commands/", response_model=schemas.Command)
+def send_command(device_id: int, command: schemas.CommandBase, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    cmd_create = schemas.CommandCreate(**command.dict(), device_id=device_id)
+    return crud.create_command(db=db, command=cmd_create, user_id=current_user.id)
+
+@router.get("/devices/{device_id}/media/", response_model=List[schemas.MediaFile])
+def read_media(device_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return crud.get_media_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
+

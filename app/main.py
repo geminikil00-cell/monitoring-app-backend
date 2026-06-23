@@ -1,6 +1,8 @@
 import os
+import pathlib
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.db.database import Base, engine
 from app.db import models
 from app.api.v1 import endpoints
@@ -26,12 +28,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from fastapi.staticfiles import StaticFiles
+BASE_DIR = pathlib.Path(__file__).resolve().parent.parent
+static_dir = BASE_DIR / "static"
+os.makedirs(static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-# Ensure static folder exists
-os.makedirs("static", exist_ok=True)
-
-app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(endpoints.router, prefix="/api/v1")
 
 @app.get("/")

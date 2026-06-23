@@ -17,6 +17,8 @@ class User(Base):
     app_usage = relationship("AppUsage", back_populates="owner")
     web_activity = relationship("WebActivity", back_populates="owner")
     locations = relationship("Location", back_populates="owner")
+    installed_apps = relationship("InstalledApp", back_populates="owner")
+    notifications = relationship("Notification", back_populates="owner")
 
 class Device(Base):
     __tablename__ = "devices"
@@ -27,7 +29,7 @@ class Device(Base):
     model = Column(String)
     os_version = Column(String)
     battery_level = Column(Integer, default=100)
-    last_seen = Column(DateTime(timezone=True), onupdate=func.now(), default=func.now())
+    last_seen = Column(DateTime(timezone=True), default=func.now())
     owner_id = Column(Integer, ForeignKey("users.id"))
 
     owner = relationship("User", back_populates="devices")
@@ -36,6 +38,8 @@ class Device(Base):
     app_usage = relationship("AppUsage", back_populates="device")
     web_activity = relationship("WebActivity", back_populates="device")
     locations = relationship("Location", back_populates="device")
+    installed_apps = relationship("InstalledApp", back_populates="device")
+    notifications = relationship("Notification", back_populates="device")
 
 class CallLog(Base):
     __tablename__ = "call_logs"
@@ -102,8 +106,8 @@ class InstalledApp(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     device_id = Column(Integer, ForeignKey("devices.id"))
 
-    owner = relationship("User")
-    device = relationship("Device")
+    owner = relationship("User", back_populates="installed_apps")
+    device = relationship("Device", back_populates="installed_apps")
 
 class Notification(Base):
     __tablename__ = "notifications"
@@ -116,8 +120,8 @@ class Notification(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     device_id = Column(Integer, ForeignKey("devices.id"))
 
-    owner = relationship("User")
-    device = relationship("Device")
+    owner = relationship("User", back_populates="notifications")
+    device = relationship("Device", back_populates="notifications")
 
 class Location(Base):
     __tablename__ = "locations"
@@ -131,3 +135,24 @@ class Location(Base):
 
     owner = relationship("User", back_populates="locations")
     device = relationship("Device", back_populates="locations")
+
+class Command(Base):
+    __tablename__ = "commands"
+    id = Column(Integer, primary_key=True, index=True)
+    command_type = Column(String)
+    status = Column(String, default="pending")
+    payload = Column(String, nullable=True)
+    result = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.now())
+    device_id = Column(Integer, ForeignKey("devices.id"))
+    owner_id = Column(Integer, ForeignKey("users.id"))
+
+class MediaFile(Base):
+    __tablename__ = "media_files"
+    id = Column(Integer, primary_key=True, index=True)
+    s3_key = Column(String)
+    file_type = Column(String)
+    created_at = Column(DateTime(timezone=True), default=func.now())
+    device_id = Column(Integer, ForeignKey("devices.id"))
+    owner_id = Column(Integer, ForeignKey("users.id"))
+

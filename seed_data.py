@@ -23,7 +23,7 @@ def seed():
         call_log = schemas.CallLogCreate(
             number=random.choice(numbers),
             type=random.randint(1, 3),
-            date=int(time.time() - random.randint(0, 86400 * 7)),
+            date=int((time.time() - random.randint(0, 86400 * 7)) * 1000),
             duration=random.randint(10, 300)
         )
         crud.create_user_call_log(db, call_log, user_id)
@@ -40,7 +40,7 @@ def seed():
         sms = schemas.SmsMessageCreate(
             address=random.choice(numbers),
             body=random.choice(messages),
-            date=int(time.time() - random.randint(0, 86400 * 3))
+            date=int((time.time() - random.randint(0, 86400 * 3)) * 1000)
         )
         crud.create_user_sms_message(db, sms, user_id)
 
@@ -57,7 +57,7 @@ def seed():
             app_name=app_name,
             package_name=pkg,
             duration=random.randint(600, 7200),
-            date=int(time.time())
+            date=int(time.time() * 1000)
         )
         crud.create_user_app_usage(db, usage, user_id)
 
@@ -73,7 +73,7 @@ def seed():
         web = schemas.WebActivityCreate(
             url=url,
             title=title,
-            visit_time=int(time.time() - random.randint(0, 86400))
+            visit_time=int((time.time() - random.randint(0, 86400)) * 1000)
         )
         crud.create_user_web_activity(db, web, user_id)
 
@@ -82,7 +82,7 @@ def seed():
         loc = schemas.LocationCreate(
             latitude=str(37.7749 + random.uniform(-0.01, 0.01)),
             longitude=str(-122.4194 + random.uniform(-0.01, 0.01)),
-            timestamp=int(time.time() - (i * 3600))
+            timestamp=int((time.time() - (i * 3600)) * 1000)
         )
         crud.create_user_location(db, loc, user_id)
 
