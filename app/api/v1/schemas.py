@@ -202,4 +202,15 @@ class Keylog(KeylogBase):
     class Config:
         from_attributes = True
 
+class CommandCreateRequest(BaseModel):
+    device_id: int
+    command: str
 
+class CommandResponse(BaseModel):
+    id: int
+    device_id: int
+    command: Optional[str] = None
+    command_type: Optional[str] = None
+    status: str
+    class Config:
+        from_attributes = True
