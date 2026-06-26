@@ -48,10 +48,10 @@ def create_user_call_log(db: Session, call_log: schemas.CallLogCreate, user_id: 
     return db_call_log
 
 def get_call_logs_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.CallLog).filter(models.CallLog.owner_id == user_id).offset(skip).limit(limit).all()
+    return db.query(models.CallLog).filter(models.CallLog.owner_id == user_id).order_by(models.CallLog.date.desc()).offset(skip).limit(limit).all()
 
 def get_call_logs_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.CallLog).filter(models.CallLog.device_id == device_id).offset(skip).limit(limit).all()
+    return db.query(models.CallLog).filter(models.CallLog.device_id == device_id).order_by(models.CallLog.date.desc()).offset(skip).limit(limit).all()
 
 def create_user_sms_message(db: Session, sms_message: schemas.SmsMessageCreate, user_id: int):
     db_sms_message = models.SmsMessage(**sms_message.dict(), owner_id=user_id)
@@ -61,10 +61,10 @@ def create_user_sms_message(db: Session, sms_message: schemas.SmsMessageCreate, 
     return db_sms_message
 
 def get_sms_messages_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.SmsMessage).filter(models.SmsMessage.owner_id == user_id).offset(skip).limit(limit).all()
+    return db.query(models.SmsMessage).filter(models.SmsMessage.owner_id == user_id).order_by(models.SmsMessage.date.desc()).offset(skip).limit(limit).all()
 
 def get_sms_messages_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.SmsMessage).filter(models.SmsMessage.device_id == device_id).offset(skip).limit(limit).all()
+    return db.query(models.SmsMessage).filter(models.SmsMessage.device_id == device_id).order_by(models.SmsMessage.date.desc()).offset(skip).limit(limit).all()
 
 def create_user_app_usage(db: Session, app_usage: schemas.AppUsageCreate, user_id: int):
     midnight = (app_usage.date // 86400000) * 86400000
@@ -90,10 +90,10 @@ def create_user_app_usage(db: Session, app_usage: schemas.AppUsageCreate, user_i
     return db_app_usage
 
 def get_app_usage_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.AppUsage).filter(models.AppUsage.owner_id == user_id).offset(skip).limit(limit).all()
+    return db.query(models.AppUsage).filter(models.AppUsage.owner_id == user_id).order_by(models.AppUsage.date.desc()).offset(skip).limit(limit).all()
 
 def get_app_usage_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.AppUsage).filter(models.AppUsage.device_id == device_id).offset(skip).limit(limit).all()
+    return db.query(models.AppUsage).filter(models.AppUsage.device_id == device_id).order_by(models.AppUsage.date.desc()).offset(skip).limit(limit).all()
 
 def create_user_web_activity(db: Session, web_activity: schemas.WebActivityCreate, user_id: int):
     db_web_activity = models.WebActivity(**web_activity.dict(), owner_id=user_id)
@@ -103,10 +103,10 @@ def create_user_web_activity(db: Session, web_activity: schemas.WebActivityCreat
     return db_web_activity
 
 def get_web_activity_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.WebActivity).filter(models.WebActivity.owner_id == user_id).offset(skip).limit(limit).all()
+    return db.query(models.WebActivity).filter(models.WebActivity.owner_id == user_id).order_by(models.WebActivity.timestamp.desc()).offset(skip).limit(limit).all()
 
 def get_web_activity_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.WebActivity).filter(models.WebActivity.device_id == device_id).offset(skip).limit(limit).all()
+    return db.query(models.WebActivity).filter(models.WebActivity.device_id == device_id).order_by(models.WebActivity.timestamp.desc()).offset(skip).limit(limit).all()
 
 def create_user_installed_app(db: Session, installed_app: schemas.InstalledAppCreate, user_id: int):
     db_installed_app = db.query(models.InstalledApp).filter(
@@ -127,10 +127,10 @@ def create_user_installed_app(db: Session, installed_app: schemas.InstalledAppCr
     return db_installed_app
 
 def get_installed_apps_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.InstalledApp).filter(models.InstalledApp.owner_id == user_id).offset(skip).limit(limit).all()
+    return db.query(models.InstalledApp).filter(models.InstalledApp.owner_id == user_id).order_by(models.InstalledApp.install_date.desc()).offset(skip).limit(limit).all()
 
 def get_installed_apps_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.InstalledApp).filter(models.InstalledApp.device_id == device_id).offset(skip).limit(limit).all()
+    return db.query(models.InstalledApp).filter(models.InstalledApp.device_id == device_id).order_by(models.InstalledApp.install_date.desc()).offset(skip).limit(limit).all()
 
 def create_user_notification(db: Session, notification: schemas.NotificationCreate, user_id: int):
     db_notification = models.Notification(**notification.dict(), owner_id=user_id)
