@@ -103,10 +103,10 @@ def create_user_web_activity(db: Session, web_activity: schemas.WebActivityCreat
     return db_web_activity
 
 def get_web_activity_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.WebActivity).filter(models.WebActivity.owner_id == user_id).order_by(models.WebActivity.timestamp.desc()).offset(skip).limit(limit).all()
+    return db.query(models.WebActivity).filter(models.WebActivity.owner_id == user_id).order_by(models.WebActivity.visit_time.desc()).offset(skip).limit(limit).all()
 
 def get_web_activity_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.WebActivity).filter(models.WebActivity.device_id == device_id).order_by(models.WebActivity.timestamp.desc()).offset(skip).limit(limit).all()
+    return db.query(models.WebActivity).filter(models.WebActivity.device_id == device_id).order_by(models.WebActivity.visit_time.desc()).offset(skip).limit(limit).all()
 
 def create_user_installed_app(db: Session, installed_app: schemas.InstalledAppCreate, user_id: int):
     db_installed_app = db.query(models.InstalledApp).filter(
