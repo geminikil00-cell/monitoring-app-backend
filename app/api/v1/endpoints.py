@@ -290,7 +290,7 @@ def enqueue_command(
     cmd = models.Command(
         device_id=cmd_req.device_id,
         command=cmd_req.command,
-        status="PENDING",
+        status="pending",
         created_at=int(time.time() * 1000)
     )
     db.add(cmd)

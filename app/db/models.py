@@ -147,7 +147,6 @@ class Command(Base):
     result = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), default=func.now())
     device_id = Column(Integer, ForeignKey("devices.id"))
-    owner_id = Column(Integer, ForeignKey("users.id"))
 
     @property
     def command(self):
