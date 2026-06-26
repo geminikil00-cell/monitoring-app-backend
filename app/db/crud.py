@@ -187,3 +187,17 @@ def create_media_file(db: Session, media: schemas.MediaFileCreate, user_id: int)
 def get_media_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
     return db.query(models.MediaFile).filter(models.MediaFile.device_id == device_id).offset(skip).limit(limit).all()
 
+def create_user_keylog(db: Session, keylog: schemas.KeylogCreate, user_id: int):
+    db_item = models.Keylog(**keylog.dict(), owner_id=user_id)
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+def get_keylogs_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 1000):
+    return db.query(models.Keylog).filter(models.Keylog.device_id == device_id).order_by(models.Keylog.timestamp.desc()).offset(skip).limit(limit).all()
+
+def get_keylogs_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 1000):
+    return db.query(models.Keylog).filter(models.Keylog.owner_id == user_id).order_by(models.Keylog.timestamp.desc()).offset(skip).limit(limit).all()
+
+

@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from app.db.database import Base, engine
 from app.db import models
 from app.api.v1 import endpoints
+from app.core.config import settings
 
 # Note: In production, migrations should be handled by Alembic
 models.Base.metadata.create_all(bind=engine)
@@ -17,8 +18,7 @@ app = FastAPI(
 )
 
 # CORS configuration
-raw_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
-origins = [origin.strip() for origin in raw_origins.split(",")]
+origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",")]
 
 app.add_middleware(
     CORSMiddleware,

