@@ -177,7 +177,10 @@ class MediaFileBase(BaseModel):
     s3_key: str
     file_type: str = "image/jpeg"
     file_name: Optional[str] = "unknown"
-    file_size: Optional[int] = 0
+    file_path: Optional[str] = None
+    category: Optional[str] = None
+    size: Optional[int] = 0
+    thumbnail_key: Optional[str] = None
     captured_at: Optional[int] = 0
 
 class MediaFileCreate(MediaFileBase):
