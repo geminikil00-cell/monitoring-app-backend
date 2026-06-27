@@ -183,9 +183,11 @@ class MediaFileBase(BaseModel):
 class MediaFileCreate(MediaFileBase):
     device_id: int
 
-class MediaFile(MediaFileBase):
+class MediaFileResponse(MediaFileBase):
     id: int
+    created_at: Optional[datetime] = None
     device_id: int
+    owner_id: Optional[int] = None
     class Config: from_attributes = True
 
 class KeylogBase(BaseModel):
