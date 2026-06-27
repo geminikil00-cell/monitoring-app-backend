@@ -184,19 +184,6 @@ def create_media_file(db: Session, media: schemas.MediaFileCreate, user_id: int)
     db.refresh(db_media)
     return db_media
 
-def create_media_record(db: Session, device_id: int, s3_key: str, file_name: str, file_size: int, captured_at: int):
-    media = models.MediaFile(
-        device_id=device_id,
-        s3_key=s3_key,
-        file_name=file_name,
-        file_size=file_size,
-        captured_at=captured_at
-    )
-    db.add(media)
-    db.commit()
-    db.refresh(media)
-    return media
-
 def get_media_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
     return db.query(models.MediaFile).filter(models.MediaFile.device_id == device_id).order_by(models.MediaFile.id.desc()).offset(skip).limit(limit).all()
 

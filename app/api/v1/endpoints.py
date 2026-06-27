@@ -272,20 +272,22 @@ def send_command(device_id: int, command: schemas.CommandBase, db: Session = Dep
 
 @router.post("/media/presigned-put", response_model=schemas.PresignedPutResponse)
 def get_presigned_put(req: schemas.PresignedPutRequest, current_device: models.Device = Depends(security.get_current_device)):
-    key = f"devices/{current_device.id}/{uuid.uuid4()}_{req.file_name}"
+    safe_filename = os.path.basename(req.file_name)
+    key = f"devices/{current_device.id}/{uuid.uuid4()}_{safe_filename}"
     url = r2_service.generate_presigned_put(key, req.file_type)
     return {"upload_url": url, "s3_key": key}
 
 @router.post("/media/complete", response_model=schemas.MediaFileResponse)
-def complete_media_upload(req: schemas.MediaCompleteRequest, db: Session = Depends(database.get_db), current_device: models.Device = Depends(security.get_current_device)):
-    return crud.create_media_record(db, current_device.id, req.s3_key, req.file_name, req.file_size, req.captured_at)
+def complete_media_upload(req: schemas.MediaFileBase, db: Session = Depends(database.get_db), current_device: models.Device = Depends(security.get_current_device)):
+    media_create = schemas.MediaFileCreate(**req.dict(), device_id=current_device.id)
+    return crud.create_media_file(db, media_create, current_device.owner_id)
 
 @router.get("/devices/{device_id}/media", response_model=List[schemas.MediaFileResponse])
-def list_device_media(device_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(security.get_current_user)):
-    devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
-    if not any(d.id == device_id for d in devices):
+def list_device_media(device_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db), current_user: models.User = Depends(security.get_current_user)):
+    device = db.query(models.Device).filter(models.Device.id == device_id, models.Device.owner_id == current_user.id).first()
+    if not device:
         raise HTTPException(status_code=403, detail="Not authorized to access media for this device")
-    items = crud.get_media_by_device(db, device_id)
+    items = crud.get_media_by_device(db, device_id, skip=skip, limit=limit)
     res = []
     for m in items:
         validate_fn = getattr(schemas.MediaFileResponse, "model_validate", getattr(schemas.MediaFileResponse, "from_orm", None))

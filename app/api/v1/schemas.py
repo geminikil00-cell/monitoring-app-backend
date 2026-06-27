@@ -175,7 +175,7 @@ class Command(CommandBase):
 
 class MediaFileBase(BaseModel):
     s3_key: str
-    file_type: str
+    file_type: str = "image/jpeg"
     file_name: Optional[str] = "unknown"
     file_size: Optional[int] = 0
     captured_at: Optional[int] = 0
@@ -226,20 +226,5 @@ class PresignedPutResponse(BaseModel):
     upload_url: str
     s3_key: str
 
-class MediaCompleteRequest(BaseModel):
-    s3_key: str
-    file_name: str
-    file_size: int = 0
-    captured_at: int = 0
-
-class MediaFileResponse(BaseModel):
-    id: int
-    device_id: int
-    file_name: str
-    s3_key: str
-    file_type: str
-    file_size: int
-    captured_at: int
+class MediaFileResponse(MediaFile):
     url: Optional[str] = None
-    class Config:
-        from_attributes = True
