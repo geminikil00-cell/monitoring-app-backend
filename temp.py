@@ -142,7 +142,7 @@ class Location(Base):
 class Command(Base):
     __tablename__ = "commands"
     id = Column(Integer, primary_key=True, index=True)
-    command = Column(String)
+    command_type = Column(String)
     status = Column(String, default="pending")
     payload = Column(String, nullable=True)
     result = Column(String, nullable=True)
@@ -150,16 +150,12 @@ class Command(Base):
     device_id = Column(Integer, ForeignKey("devices.id"))
 
     @property
-    def command_type(self):
-        return self.command
-
-    @command_type.setter
-    def command_type(self, value):
-        self.command = value
+    def command(self):
+        return self.command_type
 
     def __init__(self, **kwargs):
-        if "command_type" in kwargs and "command" not in kwargs:
-            kwargs["command"] = kwargs.pop("command_type")
+        if "command" in kwargs and "command_type" not in kwargs:
+            kwargs["command_type"] = kwargs.pop("command")
         if "created_at" in kwargs and isinstance(kwargs["created_at"], (int, float)):
             import datetime
             ts = kwargs["created_at"]
