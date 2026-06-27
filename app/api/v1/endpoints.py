@@ -282,10 +282,14 @@ def complete_media_upload(req: schemas.MediaCompleteRequest, db: Session = Depen
 
 @router.get("/devices/{device_id}/media", response_model=List[schemas.MediaFileResponse])
 def list_device_media(device_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(security.get_current_user)):
+    devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
+    if not any(d.id == device_id for d in devices):
+        raise HTTPException(status_code=403, detail="Not authorized to access media for this device")
     items = crud.get_media_by_device(db, device_id)
     res = []
     for m in items:
-        m_dict = schemas.MediaFileResponse.from_orm(m)
+        validate_fn = getattr(schemas.MediaFileResponse, "model_validate", getattr(schemas.MediaFileResponse, "from_orm", None))
+        m_dict = validate_fn(m)
         m_dict.url = r2_service.generate_presigned_get(m.s3_key)
         res.append(m_dict)
     return res
