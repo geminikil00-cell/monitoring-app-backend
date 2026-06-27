@@ -322,23 +322,19 @@ def enqueue_command(
     db.refresh(cmd)
     return cmd
 
+latest_screen_frames: dict = {}
+latest_camera_frames: dict = {}
+latest_audio_chunks: dict = {}
+
 @router.post("/live-screen")
 def upload_live_screen_frame(
     file: UploadFile = File(...),
     timestamp: int = Form(...),
-    db: Session = Depends(database.get_db),
-    device: models.Device = Depends(security.verify_device_token)
+    current_device: models.Device = Depends(security.get_current_device)
 ):
     frame_bytes = file.file.read()
-    frame = db.query(models.LiveScreenFrame).filter(models.LiveScreenFrame.device_id == device.id).first()
-    if not frame:
-        frame = models.LiveScreenFrame(device_id=device.id, frame_data=frame_bytes, timestamp=timestamp)
-        db.add(frame)
-    else:
-        frame.frame_data = frame_bytes
-        frame.timestamp = timestamp
-    db.commit()
-    return {"status": "ok"}
+    latest_screen_frames[current_device.id] = (frame_bytes, timestamp)
+    return {"status": "ok", "size": len(frame_bytes)}
 
 @router.get("/live-screen/latest")
 def get_latest_live_frame(
@@ -346,13 +342,14 @@ def get_latest_live_frame(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
-    frame = db.query(models.LiveScreenFrame).filter(models.LiveScreenFrame.device_id == device_id).first()
-    if not frame or not frame.frame_data:
+    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
+    if not device:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    entry = latest_screen_frames.get(device_id)
+    if not entry:
         return Response(status_code=404)
-    return Response(content=frame.frame_data, media_type="image/jpeg", headers={"X-Frame-Timestamp": str(frame.timestamp)})
-
-latest_camera_frames: dict = {}
-latest_audio_chunks: dict = {}
+    data, ts = entry
+    return Response(content=data, media_type="image/jpeg", headers={"X-Frame-Timestamp": str(ts)})
 
 @router.post("/live-camera")
 def upload_live_camera_frame(
