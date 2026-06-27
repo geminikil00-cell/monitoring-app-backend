@@ -31,6 +31,9 @@ def get_device_by_token(db: Session, token: str):
 def get_devices_by_user(db: Session, user_id: int):
     return db.query(models.Device).filter(models.Device.owner_id == user_id).all()
 
+def get_device_by_id_and_owner(db: Session, device_id: int, owner_id: int):
+    return db.query(models.Device).filter(models.Device.id == device_id, models.Device.owner_id == owner_id).first()
+
 def update_device_heartbeat(db: Session, device_id: int, battery_level: int):
     db_device = db.query(models.Device).filter(models.Device.id == device_id).first()
     if db_device:

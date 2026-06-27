@@ -357,11 +357,10 @@ latest_audio_chunks: dict = {}
 @router.post("/live-camera")
 def upload_live_camera_frame(
     file: UploadFile = File(...),
-    db: Session = Depends(database.get_db),
     current_device: models.Device = Depends(security.get_current_device)
 ):
     data = file.file.read()
-    latest_camera_frames[current_device.id] = data
+    latest_camera_frames[current_device.id] = (data, time.time())
     return {"status": "ok", "size": len(data)}
 
 @router.get("/live-camera/latest")
@@ -370,22 +369,22 @@ def get_latest_camera_frame(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
-    device = db.query(models.Device).filter(models.Device.id == device_id, models.Device.owner_id == current_user.id).first()
+    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
     if not device:
         raise HTTPException(status_code=403, detail="Not authorized")
-    data = latest_camera_frames.get(device_id)
-    if not data:
+    entry = latest_camera_frames.get(device_id)
+    if not entry:
         raise HTTPException(status_code=404, detail="No camera frame available")
-    return Response(content=data, media_type="image/jpeg")
+    data, ts = entry
+    return Response(content=data, media_type="image/jpeg", headers={"X-Frame-Timestamp": str(ts)})
 
 @router.post("/live-audio")
 def upload_live_audio_chunk(
     file: UploadFile = File(...),
-    db: Session = Depends(database.get_db),
     current_device: models.Device = Depends(security.get_current_device)
 ):
     data = file.file.read()
-    latest_audio_chunks[current_device.id] = data
+    latest_audio_chunks[current_device.id] = (data, time.time())
     return {"status": "ok", "size": len(data)}
 
 @router.get("/live-audio/latest")
@@ -394,11 +393,12 @@ def get_latest_audio_chunk(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
-    device = db.query(models.Device).filter(models.Device.id == device_id, models.Device.owner_id == current_user.id).first()
+    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
     if not device:
         raise HTTPException(status_code=403, detail="Not authorized")
-    data = latest_audio_chunks.get(device_id)
-    if not data:
+    entry = latest_audio_chunks.get(device_id)
+    if not entry:
         raise HTTPException(status_code=404, detail="No audio chunk available")
-    return Response(content=data, media_type="audio/aac")
+    data, ts = entry
+    return Response(content=data, media_type="audio/aac", headers={"X-Frame-Timestamp": str(ts)})
 
