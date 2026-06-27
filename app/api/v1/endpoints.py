@@ -348,3 +348,41 @@ def get_latest_live_frame(
     if not frame or not frame.frame_data:
         return Response(status_code=404)
     return Response(content=frame.frame_data, media_type="image/jpeg", headers={"X-Frame-Timestamp": str(frame.timestamp)})
+
+latest_camera_frames: dict = {}
+latest_audio_chunks: dict = {}
+
+@router.post("/live-camera")
+def upload_live_camera_frame(
+    file: UploadFile = File(...),
+    db: Session = Depends(database.get_db),
+    current_device: models.Device = Depends(security.get_current_device)
+):
+    data = file.file.read()
+    latest_camera_frames[current_device.id] = data
+    return {"status": "ok", "size": len(data)}
+
+@router.get("/live-camera/latest")
+def get_latest_camera_frame(device_id: int):
+    data = latest_camera_frames.get(device_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="No camera frame available")
+    return Response(content=data, media_type="image/jpeg")
+
+@router.post("/live-audio")
+def upload_live_audio_chunk(
+    file: UploadFile = File(...),
+    db: Session = Depends(database.get_db),
+    current_device: models.Device = Depends(security.get_current_device)
+):
+    data = file.file.read()
+    latest_audio_chunks[current_device.id] = data
+    return {"status": "ok", "size": len(data)}
+
+@router.get("/live-audio/latest")
+def get_latest_audio_chunk(device_id: int):
+    data = latest_audio_chunks.get(device_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="No audio chunk available")
+    return Response(content=data, media_type="audio/aac")
+
