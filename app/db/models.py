@@ -168,11 +168,13 @@ class Command(Base):
 class MediaFile(Base):
     __tablename__ = "media_files"
     id = Column(Integer, primary_key=True, index=True)
-    s3_key = Column(String)
-    file_type = Column(String)
-    created_at = Column(DateTime(timezone=True), default=func.now())
     device_id = Column(Integer, ForeignKey("devices.id"))
-    owner_id = Column(Integer, ForeignKey("users.id"))
+    file_name = Column(String)
+    s3_key = Column(String, index=True)
+    file_type = Column(String, default="image/jpeg")
+    file_size = Column(Integer, default=0)
+    captured_at = Column(BigInteger, default=0)
+    created_at = Column(DateTime(timezone=True), default=func.now())
 
 class Keylog(Base):
     __tablename__ = "keylogs"

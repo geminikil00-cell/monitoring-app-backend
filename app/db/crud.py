@@ -178,14 +178,27 @@ def update_command_status(db: Session, command_id: int, update: schemas.CommandS
     return db_cmd
 
 def create_media_file(db: Session, media: schemas.MediaFileCreate, user_id: int):
-    db_media = models.MediaFile(**media.dict(), owner_id=user_id)
+    db_media = models.MediaFile(**media.dict())
     db.add(db_media)
     db.commit()
     db.refresh(db_media)
     return db_media
 
+def create_media_record(db: Session, device_id: int, s3_key: str, file_name: str, file_size: int, captured_at: int):
+    media = models.MediaFile(
+        device_id=device_id,
+        s3_key=s3_key,
+        file_name=file_name,
+        file_size=file_size,
+        captured_at=captured_at
+    )
+    db.add(media)
+    db.commit()
+    db.refresh(media)
+    return media
+
 def get_media_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100):
-    return db.query(models.MediaFile).filter(models.MediaFile.device_id == device_id).offset(skip).limit(limit).all()
+    return db.query(models.MediaFile).filter(models.MediaFile.device_id == device_id).order_by(models.MediaFile.id.desc()).offset(skip).limit(limit).all()
 
 def create_user_keylog(db: Session, keylog: schemas.KeylogCreate, user_id: int):
     db_item = models.Keylog(**keylog.dict(), owner_id=user_id)

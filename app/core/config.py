@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     S3_REGION: str = "auto"
     S3_ENDPOINT: Optional[str] = None
 
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET_NAME: str = "parental-media"
+    R2_ENDPOINT_URL: str = ""
+
     model_config = {"env_file": ".env", "case_sensitive": True}
 
 settings = Settings()

