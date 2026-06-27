@@ -145,7 +145,6 @@ class Command(Base):
     command_type = Column(String)
     status = Column(String, default="pending")
     payload = Column(String, nullable=True)
-    result = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), default=func.now())
     device_id = Column(Integer, ForeignKey("devices.id"))
 
