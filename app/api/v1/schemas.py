@@ -188,6 +188,7 @@ class MediaFileResponse(MediaFileBase):
     created_at: Optional[datetime] = None
     device_id: int
     owner_id: Optional[int] = None
+    url: Optional[str] = None
     class Config: from_attributes = True
 
 class KeylogBase(BaseModel):
@@ -227,6 +228,3 @@ class PresignedPutRequest(BaseModel):
 class PresignedPutResponse(BaseModel):
     upload_url: str
     s3_key: str
-
-class MediaFileResponse(MediaFile):
-    url: Optional[str] = None
