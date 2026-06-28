@@ -181,7 +181,7 @@ def update_command_status(db: Session, command_id: int, update: schemas.CommandS
     return db_cmd
 
 def create_media_file(db: Session, media: schemas.MediaFileCreate, user_id: int):
-    db_media = models.MediaFile(**media.dict())
+    db_media = models.MediaFile(**media.dict(), owner_id=user_id)
     db.add(db_media)
     db.commit()
     db.refresh(db_media)

