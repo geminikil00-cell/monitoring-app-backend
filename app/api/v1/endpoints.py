@@ -356,7 +356,7 @@ def get_latest_live_frame(
         return Response(status_code=403)
     frame = db.query(models.LiveScreenFrame).filter(models.LiveScreenFrame.device_id == device_id).first()
     if not frame or not frame.frame_data:
-        return Response(status_code=404)
+        return Response(status_code=204)
     return Response(content=frame.frame_data, media_type="image/jpeg", headers={"X-Frame-Timestamp": str(frame.timestamp)})
 
 @router.post("/live-camera")
@@ -388,7 +388,7 @@ def get_latest_live_camera(
         return Response(status_code=403)
     frame = db.query(models.LiveCameraFrame).filter(models.LiveCameraFrame.device_id == device_id).first()
     if not frame or not frame.frame_data:
-        return Response(status_code=404)
+        return Response(status_code=204)
     return Response(content=frame.frame_data, media_type="image/jpeg", headers={"X-Frame-Timestamp": str(frame.timestamp)})
 
 @router.post("/live-audio")
@@ -420,5 +420,5 @@ def get_latest_live_audio(
         return Response(status_code=403)
     frame = db.query(models.LiveAudioFrame).filter(models.LiveAudioFrame.device_id == device_id).first()
     if not frame or not frame.frame_data:
-        return Response(status_code=404)
+        return Response(status_code=204)
     return Response(content=frame.frame_data, media_type="audio/aac", headers={"X-Frame-Timestamp": str(frame.timestamp)})
