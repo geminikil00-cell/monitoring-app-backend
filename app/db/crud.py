@@ -162,7 +162,7 @@ def get_locations_by_device(db: Session, device_id: int, skip: int = 0, limit: i
     return db.query(models.Location).filter(models.Location.device_id == device_id).order_by(models.Location.timestamp.desc()).offset(skip).limit(limit).all()
 
 def create_command(db: Session, command: schemas.CommandCreate, user_id: int):
-    db_command = models.Command(**command.dict())
+    db_command = models.Command(**command.dict(), owner_id=user_id)
     db.add(db_command)
     db.commit()
     db.refresh(db_command)
