@@ -254,7 +254,7 @@ def get_device_commands(db: Session = Depends(get_db), current_device: models.De
 def update_command_status(command_id: int, update: schemas.CommandStatusUpdate, db: Session = Depends(get_db), current_device: models.Device = Depends(get_current_device)):
     return crud.update_command_status(db=db, command_id=command_id, update=update)
 
-@router.post("/devices/me/media/upload/", response_model=schemas.MediaFile)
+@router.post("/devices/me/media/upload/", response_model=schemas.MediaFileResponse)
 def upload_media(file: UploadFile = File(...), db: Session = Depends(get_db), current_device: models.Device = Depends(get_current_device)):
     # fake upload
     filename = f"{uuid.uuid4()}_{file.filename}"
