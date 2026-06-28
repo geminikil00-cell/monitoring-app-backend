@@ -11,6 +11,20 @@ from app.core.config import settings
 # Note: In production, migrations should be handled by Alembic
 models.Base.metadata.create_all(bind=engine)
 
+from sqlalchemy import text
+try:
+    with engine.begin() as conn:
+        try:
+            conn.execute(text("ALTER TABLE commands ADD COLUMN owner_id INTEGER REFERENCES users(id)"))
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE commands ADD COLUMN result VARCHAR"))
+        except Exception:
+            pass
+except Exception as e:
+    print("Migration error:", e)
+
 app = FastAPI(
     title="Parental Control API",
     description="API for monitoring and controlling child devices.",
