@@ -327,22 +327,21 @@ def enqueue_command(
     db.refresh(cmd)
     return cmd
 
+# In-memory storage for live streams to prevent database locking and minimize latency
+live_streams_cache = {
+    "screen": {}, # device_id -> {"data": bytes, "timestamp": int}
+    "camera": {},
+    "audio": {}
+}
+
 @router.post("/live-screen")
 def upload_live_screen_frame(
     file: UploadFile = File(...),
     timestamp: int = Form(...),
-    db: Session = Depends(database.get_db),
     device: models.Device = Depends(security.verify_device_token)
 ):
     frame_bytes = file.file.read()
-    frame = db.query(models.LiveScreenFrame).filter(models.LiveScreenFrame.device_id == device.id).first()
-    if not frame:
-        frame = models.LiveScreenFrame(device_id=device.id, frame_data=frame_bytes, timestamp=timestamp)
-        db.add(frame)
-    else:
-        frame.frame_data = frame_bytes
-        frame.timestamp = timestamp
-    db.commit()
+    live_streams_cache["screen"][device.id] = {"data": frame_bytes, "timestamp": timestamp}
     return {"status": "ok"}
 
 @router.get("/live-screen/latest")
@@ -354,27 +353,26 @@ def get_latest_live_frame(
     device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
     if not device:
         return Response(status_code=403)
-    frame = db.query(models.LiveScreenFrame).filter(models.LiveScreenFrame.device_id == device_id).first()
-    if not frame or not frame.frame_data:
+    frame = live_streams_cache["screen"].get(device_id)
+    if not frame:
         return Response(status_code=204)
-    return Response(content=frame.frame_data, media_type="image/jpeg", headers={"X-Frame-Timestamp": str(frame.timestamp)})
+    return Response(
+        content=frame["data"], 
+        media_type="image/jpeg", 
+        headers={
+            "X-Frame-Timestamp": str(frame["timestamp"]),
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
+        }
+    )
 
 @router.post("/live-camera")
 def upload_live_camera_frame(
     file: UploadFile = File(...),
     timestamp: int = Form(...),
-    db: Session = Depends(database.get_db),
     device: models.Device = Depends(security.verify_device_token)
 ):
     frame_bytes = file.file.read()
-    frame = db.query(models.LiveCameraFrame).filter(models.LiveCameraFrame.device_id == device.id).first()
-    if not frame:
-        frame = models.LiveCameraFrame(device_id=device.id, frame_data=frame_bytes, timestamp=timestamp)
-        db.add(frame)
-    else:
-        frame.frame_data = frame_bytes
-        frame.timestamp = timestamp
-    db.commit()
+    live_streams_cache["camera"][device.id] = {"data": frame_bytes, "timestamp": timestamp}
     return {"status": "ok"}
 
 @router.get("/live-camera/latest")
@@ -386,27 +384,26 @@ def get_latest_live_camera(
     device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
     if not device:
         return Response(status_code=403)
-    frame = db.query(models.LiveCameraFrame).filter(models.LiveCameraFrame.device_id == device_id).first()
-    if not frame or not frame.frame_data:
+    frame = live_streams_cache["camera"].get(device_id)
+    if not frame:
         return Response(status_code=204)
-    return Response(content=frame.frame_data, media_type="image/jpeg", headers={"X-Frame-Timestamp": str(frame.timestamp)})
+    return Response(
+        content=frame["data"], 
+        media_type="image/jpeg", 
+        headers={
+            "X-Frame-Timestamp": str(frame["timestamp"]),
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
+        }
+    )
 
 @router.post("/live-audio")
 def upload_live_audio_frame(
     file: UploadFile = File(...),
     timestamp: int = Form(...),
-    db: Session = Depends(database.get_db),
     device: models.Device = Depends(security.verify_device_token)
 ):
     frame_bytes = file.file.read()
-    frame = db.query(models.LiveAudioFrame).filter(models.LiveAudioFrame.device_id == device.id).first()
-    if not frame:
-        frame = models.LiveAudioFrame(device_id=device.id, frame_data=frame_bytes, timestamp=timestamp)
-        db.add(frame)
-    else:
-        frame.frame_data = frame_bytes
-        frame.timestamp = timestamp
-    db.commit()
+    live_streams_cache["audio"][device.id] = {"data": frame_bytes, "timestamp": timestamp}
     return {"status": "ok"}
 
 @router.get("/live-audio/latest")
@@ -418,7 +415,14 @@ def get_latest_live_audio(
     device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
     if not device:
         return Response(status_code=403)
-    frame = db.query(models.LiveAudioFrame).filter(models.LiveAudioFrame.device_id == device_id).first()
-    if not frame or not frame.frame_data:
+    frame = live_streams_cache["audio"].get(device_id)
+    if not frame:
         return Response(status_code=204)
-    return Response(content=frame.frame_data, media_type="audio/aac", headers={"X-Frame-Timestamp": str(frame.timestamp)})
+    return Response(
+        content=frame["data"], 
+        media_type="audio/aac", 
+        headers={
+            "X-Frame-Timestamp": str(frame["timestamp"]),
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
+        }
+    )
