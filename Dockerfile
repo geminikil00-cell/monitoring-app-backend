@@ -18,4 +18,6 @@ COPY . .
 
 EXPOSE 8080
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD curl -f http://localhost:8080/ || exit 1
+
 ENTRYPOINT ["/bin/sh", "/app/docker-entrypoint.sh"]
