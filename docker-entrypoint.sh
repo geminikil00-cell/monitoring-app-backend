@@ -20,12 +20,12 @@ if [ -n "$DB_HOST" ] && [ "$DB_HOST" != "localhost" ] && [ "$DB_HOST" != "127.0.
 
     echo "Resolving $DB_HOST to IPv4..."
     IPV4=""
-    IPV4=$(getent ahostsv4 "$DB_HOST" 2>/dev/null | awk 'NR==1{print $1}')
+    IPV4=$(getent ahostsv4 "$DB_HOST" 2>/dev/null | awk 'NR==1{print $1}') || true
     if [ -z "$IPV4" ]; then
-        IPV4=$(python3 -c "import socket; print(socket.getaddrinfo('$DB_HOST', 0, socket.AF_INET)[0][4][0])" 2>/dev/null)
+        IPV4=$(python3 -c "import socket; print(socket.getaddrinfo('$DB_HOST', 0, socket.AF_INET)[0][4][0])" 2>/dev/null) || true
     fi
     if [ -z "$IPV4" ]; then
-        IPV4=$(curl -s --connect-timeout 3 "https://dns.google/resolve?name=$DB_HOST&type=A" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['Answer'][0]['data'])" 2>/dev/null)
+        IPV4=$(curl -s --connect-timeout 3 "https://dns.google/resolve?name=$DB_HOST&type=A" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['Answer'][0]['data'])" 2>/dev/null) || true
     fi
     if [ -n "$IPV4" ]; then
         echo "$IPV4 $DB_HOST" >> /etc/hosts
