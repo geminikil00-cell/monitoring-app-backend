@@ -3,14 +3,21 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 
-# Create engine for PostgreSQL (Supabase)
-engine = create_engine(settings.DATABASE_URL)
+engine = create_engine(
+    settings.DATABASE_URL,
+    pool_size=5,
+    max_overflow=10,
+    pool_pre_ping=True,
+    pool_recycle=3600,
+    connect_args={
+        "connect_timeout": 10,
+    },
+)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
-# Dependency to get a database session
 def get_db():
     db = SessionLocal()
     try:

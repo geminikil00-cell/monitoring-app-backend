@@ -2,8 +2,8 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 
 class Settings(BaseSettings):
-    # Database Settings (Supabase / PostgreSQL)
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/postgres"
+    # Database Settings (Supabase PostgreSQL — use pooler port 6543 for Docker/IPv4 compat)
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:6543/postgres"
 
     # JWT Settings
     SECRET_KEY: str
