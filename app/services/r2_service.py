@@ -21,7 +21,17 @@ def get_s3_client():
         config=Config(signature_version='s3v4')
     )
 
+def is_r2_configured() -> bool:
+    """Check if R2 credentials are actually configured (not empty strings)"""
+    return bool(
+        settings.R2_ACCESS_KEY_ID and 
+        settings.R2_SECRET_ACCESS_KEY and 
+        (settings.R2_ACCOUNT_ID or settings.R2_ENDPOINT_URL)
+    )
+
 def generate_presigned_put(key: str, content_type: str = "image/jpeg") -> str:
+    if not is_r2_configured():
+        return None
     try:
         s3 = get_s3_client()
         return s3.generate_presigned_url(
@@ -30,9 +40,11 @@ def generate_presigned_put(key: str, content_type: str = "image/jpeg") -> str:
             ExpiresIn=3600
         )
     except Exception:
-        return f"https://mock.r2.cloudflarestorage.com/{settings.R2_BUCKET_NAME}/{key}"
+        return None
 
 def generate_presigned_get(key: str) -> str:
+    if not is_r2_configured():
+        return None
     try:
         s3 = get_s3_client()
         return s3.generate_presigned_url(
@@ -41,4 +53,4 @@ def generate_presigned_get(key: str) -> str:
             ExpiresIn=3600
         )
     except Exception:
-        return f"https://mock.r2.cloudflarestorage.com/{settings.R2_BUCKET_NAME}/{key}"
+        return None

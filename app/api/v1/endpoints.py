@@ -278,7 +278,11 @@ def read_media(device_id: int, skip: int = 0, limit: int = 100, db: Session = De
     response = []
     for m in media_files:
         m_dict = {c.name: getattr(m, c.name) for c in m.__table__.columns}
-        m_dict['url'] = r2_service.generate_presigned_get(m.s3_key)
+        r2_url = r2_service.generate_presigned_get(m.s3_key)
+        if r2_url:
+            m_dict['url'] = r2_url
+        else:
+            m_dict['url'] = f"/static/{m.s3_key.lstrip('/')}"
         response.append(schemas.MediaFileResponse(**m_dict))
     return response
 
