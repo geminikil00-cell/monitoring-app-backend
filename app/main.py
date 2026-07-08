@@ -48,6 +48,26 @@ def startup_db():
                     conn.execute(text("ALTER TABLE commands ADD COLUMN IF NOT EXISTS result VARCHAR"))
                 except Exception:
                     pass
+                try:
+                    conn.execute(text("ALTER TABLE media_files ADD COLUMN IF NOT EXISTS category VARCHAR"))
+                except Exception:
+                    pass
+                try:
+                    conn.execute(text("ALTER TABLE media_files ADD COLUMN IF NOT EXISTS file_path VARCHAR"))
+                except Exception:
+                    pass
+                try:
+                    conn.execute(text("ALTER TABLE media_files ADD COLUMN IF NOT EXISTS size INTEGER DEFAULT 0"))
+                except Exception:
+                    pass
+                try:
+                    conn.execute(text("ALTER TABLE media_files ADD COLUMN IF NOT EXISTS thumbnail_key VARCHAR"))
+                except Exception:
+                    pass
+                try:
+                    conn.execute(text("ALTER TABLE media_files ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES users(id)"))
+                except Exception:
+                    pass
             print(f"Database ready (attempt {attempt})")
             break
         except Exception as e:
