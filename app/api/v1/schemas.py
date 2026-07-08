@@ -229,5 +229,5 @@ class PresignedPutRequest(BaseModel):
     file_type: str = "image/jpeg"
 
 class PresignedPutResponse(BaseModel):
-    upload_url: str
+    upload_url: Optional[str] = None
     s3_key: str

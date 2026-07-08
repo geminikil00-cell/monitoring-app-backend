@@ -270,11 +270,11 @@ def send_command(device_id: int, command: schemas.CommandBase, db: Session = Dep
     return crud.create_command(db=db, command=cmd_create, user_id=current_user.id)
 
 @router.get("/devices/{device_id}/media/", response_model=List[schemas.MediaFileResponse])
-def read_media(device_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def read_media(device_id: int, skip: int = 0, limit: int = 100, category: Optional[str] = None, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
     if not device:
         raise HTTPException(status_code=403, detail="Device not owned by user")
-    media_files = crud.get_media_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
+    media_files = crud.get_media_by_device(db=db, device_id=device_id, skip=skip, limit=limit, category=category)
     response = []
     for m in media_files:
         m_dict = {c.name: getattr(m, c.name) for c in m.__table__.columns}
@@ -294,6 +294,8 @@ def get_presigned_put(
 ):
     s3_key = f"{current_device.id}/{int(time.time())}_{req.file_name}"
     upload_url = r2_service.generate_presigned_put(s3_key, req.file_type)
+    if upload_url is None:
+        raise HTTPException(status_code=503, detail="Storage service not configured")
     return schemas.PresignedPutResponse(upload_url=upload_url, s3_key=s3_key)
 
 @router.post("/media/complete", response_model=schemas.MediaFileResponse)
