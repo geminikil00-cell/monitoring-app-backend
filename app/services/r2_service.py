@@ -42,6 +42,21 @@ def generate_presigned_put(key: str, content_type: str = "image/jpeg") -> str:
     except Exception:
         return None
 
+def upload_file(key: str, data: bytes, content_type: str = "application/octet-stream") -> bool:
+    if not is_r2_configured():
+        return False
+    try:
+        s3 = get_s3_client()
+        s3.put_object(
+            Bucket=settings.R2_BUCKET_NAME,
+            Key=key,
+            Body=data,
+            ContentType=content_type
+        )
+        return True
+    except Exception:
+        return False
+
 def generate_presigned_get(key: str) -> str:
     if not is_r2_configured():
         return None

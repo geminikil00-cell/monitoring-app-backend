@@ -200,10 +200,46 @@ def create_user_keylog(db: Session, keylog: schemas.KeylogCreate, user_id: int):
     db.refresh(db_item)
     return db_item
 
-def get_keylogs_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 1000):
-    return db.query(models.Keylog).filter(models.Keylog.device_id == device_id).order_by(models.Keylog.timestamp.desc()).offset(skip).limit(limit).all()
+def get_keylogs_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 1000, start_date: int = None, end_date: int = None):
+    q = db.query(models.Keylog).filter(models.Keylog.device_id == device_id)
+    if start_date is not None:
+        q = q.filter(models.Keylog.timestamp >= start_date)
+    if end_date is not None:
+        q = q.filter(models.Keylog.timestamp <= end_date)
+    return q.order_by(models.Keylog.timestamp.desc()).offset(skip).limit(limit).all()
 
-def get_keylogs_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 1000):
-    return db.query(models.Keylog).filter(models.Keylog.owner_id == user_id).order_by(models.Keylog.timestamp.desc()).offset(skip).limit(limit).all()
+def get_keylogs_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 1000, start_date: int = None, end_date: int = None):
+    q = db.query(models.Keylog).filter(models.Keylog.owner_id == user_id)
+    if start_date is not None:
+        q = q.filter(models.Keylog.timestamp >= start_date)
+    if end_date is not None:
+        q = q.filter(models.Keylog.timestamp <= end_date)
+    return q.order_by(models.Keylog.timestamp.desc()).offset(skip).limit(limit).all()
 
+def create_chat_message(db: Session, chat_message: schemas.ChatMessageCreate, user_id: int):
+    db_item = models.ChatMessage(**chat_message.dict(), owner_id=user_id)
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+def get_chat_messages_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 1000, start_date: int = None, end_date: int = None, package_name: str = None):
+    q = db.query(models.ChatMessage).filter(models.ChatMessage.device_id == device_id)
+    if start_date is not None:
+        q = q.filter(models.ChatMessage.timestamp >= start_date)
+    if end_date is not None:
+        q = q.filter(models.ChatMessage.timestamp <= end_date)
+    if package_name:
+        q = q.filter(models.ChatMessage.package_name == package_name)
+    return q.order_by(models.ChatMessage.timestamp.desc()).offset(skip).limit(limit).all()
+
+def get_chat_messages_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 1000, start_date: int = None, end_date: int = None, package_name: str = None):
+    q = db.query(models.ChatMessage).filter(models.ChatMessage.owner_id == user_id)
+    if start_date is not None:
+        q = q.filter(models.ChatMessage.timestamp >= start_date)
+    if end_date is not None:
+        q = q.filter(models.ChatMessage.timestamp <= end_date)
+    if package_name:
+        q = q.filter(models.ChatMessage.package_name == package_name)
+    return q.order_by(models.ChatMessage.timestamp.desc()).offset(skip).limit(limit).all()
 

