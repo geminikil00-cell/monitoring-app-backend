@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 43200
 
     # CORS Settings
-    CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
+    CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173,https://monitoring-app-frontend.geminikil00.workers.dev,https://monitoring.joclass.com"
 
     # S3 Storage Settings (e.g., Cloudflare R2 or AWS S3)
     S3_BUCKET: Optional[str] = None
