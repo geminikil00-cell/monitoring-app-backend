@@ -201,6 +201,9 @@ class MediaDeleteResponse(BaseModel):
     deleted_count: int
     r2_deleted: int
 
+class PresignedGetRequest(BaseModel):
+    s3_keys: List[str]
+
 class KeylogBase(BaseModel):
     package_name: str
     app_name: str

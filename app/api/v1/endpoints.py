@@ -3,6 +3,8 @@ import time
 import shutil
 import os
 import uuid
+import json
+import gzip
 from typing import List, Optional
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -320,7 +322,52 @@ def complete_media_upload(
     current_device: models.Device = Depends(security.verify_device_token)
 ):
     media_create = schemas.MediaFileCreate(**req.dict(), device_id=current_device.id)
-    return crud.create_media_file(db=db, media=media_create, user_id=current_device.owner_id)
+    result = crud.create_media_file(db=db, media=media_create, user_id=current_device.owner_id)
+    try:
+        build_manifest_sync(db)
+    except Exception:
+        pass
+    return result
+
+@router.get("/media/manifest")
+def get_media_manifest():
+    data = r2_service.get_file("media-manifest.json")
+    if data is None:
+        raise HTTPException(status_code=404, detail="Manifest not available")
+    compressed = gzip.compress(data)
+    headers = {"Content-Encoding": "gzip", "Cache-Control": "public, max-age=300"}
+    return Response(content=compressed, media_type="application/json", headers=headers)
+
+@router.post("/media/presigned-get")
+def batch_presigned_get(
+    req: schemas.PresignedGetRequest,
+    current_user: models.User = Depends(get_current_user)
+):
+    urls = {}
+    for key in req.s3_keys:
+        url = r2_service.generate_presigned_get(key)
+        if url:
+            urls[key] = url
+    return {"urls": urls}
+
+def build_manifest_sync(db: Session):
+    import json as _json
+    items = []
+    batch_size = 5000
+    offset = 0
+    while True:
+        batch = db.query(models.MediaFile).order_by(models.MediaFile.id).offset(offset).limit(batch_size).all()
+        if not batch:
+            break
+        for m in batch:
+            items.append({
+                "id": m.id, "s3_key": m.s3_key, "file_type": m.file_type or "image/jpeg",
+                "file_name": m.file_name or "", "category": m.category or "",
+                "size": m.size or 0, "captured_at": m.captured_at or 0,
+                "device_id": m.device_id
+            })
+        offset += batch_size
+    r2_service.upload_file("media-manifest.json", _json.dumps(items).encode("utf-8"), "application/json")
 
 @router.delete("/devices/{device_id}/media/", response_model=schemas.MediaDeleteResponse)
 def delete_media_batch(

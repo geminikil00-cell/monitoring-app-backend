@@ -90,3 +90,23 @@ def delete_files(keys: list) -> int:
         return len(keys)
     except Exception:
         return 0
+
+def get_file(key: str) -> bytes:
+    if not is_r2_configured():
+        return None
+    try:
+        s3 = get_s3_client()
+        resp = s3.get_object(Bucket=settings.R2_BUCKET_NAME, Key=key)
+        return resp['Body'].read()
+    except Exception:
+        return None
+
+def get_file_meta(key: str) -> dict:
+    if not is_r2_configured():
+        return None
+    try:
+        s3 = get_s3_client()
+        resp = s3.head_object(Bucket=settings.R2_BUCKET_NAME, Key=key)
+        return {'etag': resp.get('ETag', '').strip('"'), 'size': resp.get('ContentLength', 0)}
+    except Exception:
+        return None
