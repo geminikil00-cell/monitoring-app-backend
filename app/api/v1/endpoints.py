@@ -385,6 +385,35 @@ def build_manifest_sync(db: Session):
         offset += batch_size
     r2_service.upload_file("media-manifest.json", _json.dumps(items).encode("utf-8"), "application/json")
 
+@router.post("/media/backfill-thumbnails")
+def backfill_thumbnails(
+    background_tasks: BackgroundTasks,
+    current_user: models.User = Depends(get_current_user)
+):
+    def process():
+        tdb = database.SessionLocal()
+        try:
+            batch = tdb.query(models.MediaFile).filter(
+                (models.MediaFile.thumbnail_key == None) | (models.MediaFile.thumbnail_key == '')
+            ).limit(100).all()
+            count = 0
+            for m in batch:
+                thumb_key = r2_service.generate_thumbnail(m.s3_key)
+                if thumb_key:
+                    m.thumbnail_key = thumb_key
+                    count += 1
+            tdb.commit()
+            if count > 0:
+                build_manifest_sync(tdb)
+            print(f"Backfilled {count} thumbnails")
+        except Exception as e:
+            tdb.rollback()
+            print(f"Backfill error: {e}")
+        finally:
+            tdb.close()
+    background_tasks.add_task(process)
+    return {"message": "Backfill started (100 images per call)"}
+
 @router.delete("/devices/{device_id}/media/", response_model=schemas.MediaDeleteResponse)
 def delete_media_batch(
     device_id: int,
