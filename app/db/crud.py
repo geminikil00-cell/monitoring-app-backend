@@ -187,11 +187,42 @@ def create_media_file(db: Session, media: schemas.MediaFileCreate, user_id: int)
     db.refresh(db_media)
     return db_media
 
-def get_media_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100, category: str = None):
+def get_media_by_device(db: Session, device_id: int, skip: int = 0, limit: int = 100, category: str = None, start_date: int = None, end_date: int = None):
     query = db.query(models.MediaFile).filter(models.MediaFile.device_id == device_id)
     if category:
         query = query.filter(models.MediaFile.category == category)
+    if start_date is not None:
+        query = query.filter(models.MediaFile.captured_at >= start_date)
+    if end_date is not None:
+        query = query.filter(models.MediaFile.captured_at <= end_date)
     return query.order_by(models.MediaFile.id.desc()).offset(skip).limit(limit).all()
+
+def get_media_files_by_ids(db: Session, ids: list):
+    return db.query(models.MediaFile).filter(models.MediaFile.id.in_(ids)).all()
+
+def delete_media_files_by_ids(db: Session, ids: list) -> int:
+    if not ids:
+        return 0
+    deleted = db.query(models.MediaFile).filter(models.MediaFile.id.in_(ids)).delete(synchronize_session=False)
+    db.commit()
+    return deleted
+
+def get_media_ids_in_range(db: Session, device_id: int, start_date: int, end_date: int) -> list:
+    files = db.query(models.MediaFile).filter(
+        models.MediaFile.device_id == device_id,
+        models.MediaFile.captured_at >= start_date,
+        models.MediaFile.captured_at <= end_date
+    ).all()
+    return [{'id': f.id, 's3_key': f.s3_key} for f in files]
+
+def delete_media_files_in_range(db: Session, device_id: int, start_date: int, end_date: int) -> int:
+    deleted = db.query(models.MediaFile).filter(
+        models.MediaFile.device_id == device_id,
+        models.MediaFile.captured_at >= start_date,
+        models.MediaFile.captured_at <= end_date
+    ).delete(synchronize_session=False)
+    db.commit()
+    return deleted
 
 def create_user_keylog(db: Session, keylog: schemas.KeylogCreate, user_id: int):
     db_item = models.Keylog(**keylog.dict(), owner_id=user_id)

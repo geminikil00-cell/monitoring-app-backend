@@ -194,6 +194,13 @@ class MediaFileResponse(MediaFileBase):
     url: Optional[str] = None
     class Config: from_attributes = True
 
+class MediaBatchDeleteRequest(BaseModel):
+    media_ids: List[int]
+
+class MediaDeleteResponse(BaseModel):
+    deleted_count: int
+    r2_deleted: int
+
 class KeylogBase(BaseModel):
     package_name: str
     app_name: str

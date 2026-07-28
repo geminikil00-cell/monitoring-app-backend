@@ -69,3 +69,24 @@ def generate_presigned_get(key: str) -> str:
         )
     except Exception:
         return None
+
+def delete_file(key: str) -> bool:
+    if not is_r2_configured():
+        return False
+    try:
+        s3 = get_s3_client()
+        s3.delete_object(Bucket=settings.R2_BUCKET_NAME, Key=key)
+        return True
+    except Exception:
+        return False
+
+def delete_files(keys: list) -> int:
+    if not is_r2_configured() or not keys:
+        return 0
+    try:
+        s3 = get_s3_client()
+        objects = [{'Key': k} for k in keys]
+        s3.delete_objects(Bucket=settings.R2_BUCKET_NAME, Delete={'Objects': objects})
+        return len(keys)
+    except Exception:
+        return 0
