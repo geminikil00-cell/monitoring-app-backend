@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Response
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Response, BackgroundTasks
 import time
 import shutil
 import os
@@ -318,15 +318,31 @@ def get_presigned_put(
 @router.post("/media/complete", response_model=schemas.MediaFileResponse)
 def complete_media_upload(
     req: schemas.MediaFileBase,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_device: models.Device = Depends(security.verify_device_token)
 ):
     media_create = schemas.MediaFileCreate(**req.dict(), device_id=current_device.id)
     result = crud.create_media_file(db=db, media=media_create, user_id=current_device.owner_id)
-    try:
-        build_manifest_sync(db)
-    except Exception:
-        pass
+    s3_key = result.s3_key
+    media_id = result.id
+
+    def make_thumbnail():
+        tdb = database.SessionLocal()
+        try:
+            thumb_key = r2_service.generate_thumbnail(s3_key)
+            if thumb_key:
+                media = tdb.query(models.MediaFile).filter(models.MediaFile.id == media_id).first()
+                if media:
+                    media.thumbnail_key = thumb_key
+                    tdb.commit()
+            build_manifest_sync(tdb)
+        except Exception:
+            tdb.rollback()
+        finally:
+            tdb.close()
+
+    background_tasks.add_task(make_thumbnail)
     return result
 
 @router.get("/media/manifest")
@@ -364,7 +380,7 @@ def build_manifest_sync(db: Session):
                 "id": m.id, "s3_key": m.s3_key, "file_type": m.file_type or "image/jpeg",
                 "file_name": m.file_name or "", "category": m.category or "",
                 "size": m.size or 0, "captured_at": m.captured_at or 0,
-                "device_id": m.device_id
+                "device_id": m.device_id, "thumbnail_key": m.thumbnail_key or ""
             })
         offset += batch_size
     r2_service.upload_file("media-manifest.json", _json.dumps(items).encode("utf-8"), "application/json")

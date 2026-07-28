@@ -110,3 +110,31 @@ def get_file_meta(key: str) -> dict:
         return {'etag': resp.get('ETag', '').strip('"'), 'size': resp.get('ContentLength', 0)}
     except Exception:
         return None
+
+def generate_thumbnail(s3_key: str) -> str:
+    if not is_r2_configured():
+        return None
+    try:
+        from PIL import Image
+        import io
+        data = get_file(s3_key)
+        if not data:
+            return None
+        img = Image.open(io.BytesIO(data))
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+        w, h = img.size
+        if w <= 300:
+            thumb_data = data
+        else:
+            ratio = 300 / w
+            new_h = int(h * ratio)
+            img = img.resize((300, new_h), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format='JPEG', quality=70)
+            thumb_data = buf.getvalue()
+        thumb_key = f"thumb/{s3_key}"
+        upload_file(thumb_key, thumb_data, "image/jpeg")
+        return thumb_key
+    except Exception:
+        return None
