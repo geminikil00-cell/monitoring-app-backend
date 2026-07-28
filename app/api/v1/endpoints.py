@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Response, BackgroundTasks
+from fastapi.responses import RedirectResponse
 import time
 import shutil
 import os
@@ -324,25 +325,27 @@ def complete_media_upload(
 ):
     media_create = schemas.MediaFileCreate(**req.dict(), device_id=current_device.id)
     result = crud.create_media_file(db=db, media=media_create, user_id=current_device.owner_id)
+
     s3_key = result.s3_key
     media_id = result.id
+    thumb_key = r2_service.generate_thumbnail(s3_key)
+    if thumb_key:
+        media = db.query(models.MediaFile).filter(models.MediaFile.id == media_id).first()
+        if media:
+            media.thumbnail_key = thumb_key
+            db.commit()
+            db.refresh(result)
 
-    def make_thumbnail():
+    def rebuild_manifest():
         tdb = database.SessionLocal()
         try:
-            thumb_key = r2_service.generate_thumbnail(s3_key)
-            if thumb_key:
-                media = tdb.query(models.MediaFile).filter(models.MediaFile.id == media_id).first()
-                if media:
-                    media.thumbnail_key = thumb_key
-                    tdb.commit()
             build_manifest_sync(tdb)
         except Exception:
-            tdb.rollback()
+            pass
         finally:
             tdb.close()
 
-    background_tasks.add_task(make_thumbnail)
+    background_tasks.add_task(rebuild_manifest)
     return result
 
 @router.get("/media/manifest")
@@ -354,17 +357,12 @@ def get_media_manifest():
     headers = {"Content-Encoding": "gzip", "Cache-Control": "public, max-age=300"}
     return Response(content=compressed, media_type="application/json", headers=headers)
 
-@router.post("/media/presigned-get")
-def batch_presigned_get(
-    req: schemas.PresignedGetRequest,
-    current_user: models.User = Depends(get_current_user)
-):
-    urls = {}
-    for key in req.s3_keys:
-        url = r2_service.generate_presigned_get(key)
-        if url:
-            urls[key] = url
-    return {"urls": urls}
+@router.get("/media/img/{key:path}")
+def redirect_media_image(key: str):
+    url = r2_service.generate_presigned_get(key)
+    if url is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return RedirectResponse(url=url, status_code=302)
 
 def build_manifest_sync(db: Session):
     import json as _json

@@ -65,7 +65,7 @@ def generate_presigned_get(key: str) -> str:
         return s3.generate_presigned_url(
             ClientMethod='get_object',
             Params={'Bucket': settings.R2_BUCKET_NAME, 'Key': key},
-            ExpiresIn=3600
+            ExpiresIn=86400
         )
     except Exception:
         return None
