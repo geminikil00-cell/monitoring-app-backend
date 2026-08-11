@@ -39,7 +39,7 @@ if frontend_dir.exists():
 
     @app.get("/{full_path:path}")
     async def serve_frontend(request: Request, full_path: str):
-        if full_path.startswith("api/"):
+        if request.url.path.startswith("/api/"):
             return JSONResponse({"detail": "Not Found"}, status_code=404)
         file_path = frontend_dir / full_path
         if full_path and file_path.exists() and file_path.is_file():
