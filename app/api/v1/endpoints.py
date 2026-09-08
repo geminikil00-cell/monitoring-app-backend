@@ -24,13 +24,19 @@ from sqlalchemy.sql import func
 router = APIRouter()
 
 
+def _img_path(key: Optional[str]) -> Optional[str]:
+    if not key:
+        return None
+    s = str(key)
+    if s.startswith("http://") or s.startswith("https://"):
+        return s
+    return f"/api/v1/media/img/{s.lstrip('/')}"
+
+
 def _media_response(m: models.MediaFile) -> schemas.MediaFileResponse:
     m_dict = {c.name: getattr(m, c.name) for c in m.__table__.columns}
-    r2_url = r2_service.generate_presigned_get(m.s3_key)
-    m_dict["url"] = r2_url if r2_url else f"/static/{(m.s3_key or '').lstrip('/')}"
-    thumb_key = m.thumbnail_key or m.s3_key
-    thumb_url = r2_service.generate_presigned_get(thumb_key) if thumb_key else None
-    m_dict["thumbnail_url"] = thumb_url if thumb_url else m_dict["url"]
+    m_dict["url"] = _img_path(m.s3_key)
+    m_dict["thumbnail_url"] = _img_path(m.thumbnail_key) or m_dict["url"]
     return schemas.MediaFileResponse(**m_dict)
 
 @router.post("/users/", response_model=schemas.User)

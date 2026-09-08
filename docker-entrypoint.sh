@@ -42,7 +42,17 @@ if [ -n "$DB_HOST" ] && [ "$DB_HOST" != "localhost" ] && [ "$DB_HOST" != "127.0.
             fi
             ;;
         *)
-            echo "Docker-internal database host $DB_HOST — leaving Docker DNS in place"
+            echo "Docker-internal database host $DB_HOST — waiting for Docker DNS"
+            i=0
+            while [ "$i" -lt 30 ]; do
+                if getent hosts "$DB_HOST" >/dev/null 2>&1; then
+                    echo "Resolved $DB_HOST"
+                    break
+                fi
+                i=$((i + 1))
+                echo "Waiting for $DB_HOST ($i/30)"
+                sleep 2
+            done
             ;;
     esac
 fi
