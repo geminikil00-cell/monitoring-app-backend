@@ -192,7 +192,47 @@ class MediaFileResponse(MediaFileBase):
     device_id: int
     owner_id: Optional[int] = None
     url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    indexed_at: Optional[datetime] = None
     class Config: from_attributes = True
+
+class MediaTagIn(BaseModel):
+    tag_en: str
+    tag_ar: Optional[str] = ""
+    score: Optional[float] = 0
+
+class FaceIn(BaseModel):
+    bbox_x: int = 0
+    bbox_y: int = 0
+    bbox_w: int = 0
+    bbox_h: int = 0
+    embedding_b64: Optional[str] = None
+    quality: Optional[float] = 0
+    person_id: Optional[int] = None
+    cluster_key: Optional[str] = None
+
+class MediaIndexRequest(BaseModel):
+    caption_en: Optional[str] = ""
+    caption_ar: Optional[str] = ""
+    tags: List[MediaTagIn] = []
+    faces: List[FaceIn] = []
+    error: Optional[str] = None
+
+class PersonResponse(BaseModel):
+    id: int
+    device_id: int
+    name: Optional[str] = None
+    photo_count: int = 0
+    cover_url: Optional[str] = None
+    class Config: from_attributes = True
+
+class PersonNameUpdate(BaseModel):
+    name: str
+
+class FaceEmbeddingResponse(BaseModel):
+    person_id: int
+    face_id: int
+    embedding_b64: str
 
 class MediaBatchDeleteRequest(BaseModel):
     media_ids: List[int]

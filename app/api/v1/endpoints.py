@@ -23,6 +23,16 @@ from sqlalchemy.sql import func
 
 router = APIRouter()
 
+
+def _media_response(m: models.MediaFile) -> schemas.MediaFileResponse:
+    m_dict = {c.name: getattr(m, c.name) for c in m.__table__.columns}
+    r2_url = r2_service.generate_presigned_get(m.s3_key)
+    m_dict["url"] = r2_url if r2_url else f"/static/{(m.s3_key or '').lstrip('/')}"
+    thumb_key = m.thumbnail_key or m.s3_key
+    thumb_url = r2_service.generate_presigned_get(thumb_key) if thumb_key else None
+    m_dict["thumbnail_url"] = thumb_url if thumb_url else m_dict["url"]
+    return schemas.MediaFileResponse(**m_dict)
+
 @router.post("/users/", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email(db, email=user.email)
@@ -293,16 +303,132 @@ def read_media(device_id: int, skip: int = 0, limit: int = 100, category: Option
     if not device:
         raise HTTPException(status_code=403, detail="Device not owned by user")
     media_files = crud.get_media_by_device(db=db, device_id=device_id, skip=skip, limit=limit, category=category, start_date=start_date, end_date=end_date)
-    response = []
-    for m in media_files:
-        m_dict = {c.name: getattr(m, c.name) for c in m.__table__.columns}
-        r2_url = r2_service.generate_presigned_get(m.s3_key)
-        if r2_url:
-            m_dict['url'] = r2_url
-        else:
-            m_dict['url'] = f"/static/{m.s3_key.lstrip('/')}"
-        response.append(schemas.MediaFileResponse(**m_dict))
-    return response
+    return [_media_response(m) for m in media_files]
+
+
+@router.get("/media/unindexed", response_model=List[schemas.MediaFileResponse])
+def list_unindexed_media(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    rows = crud.get_unindexed_media(db, owner_id=current_user.id, limit=min(limit, 100))
+    return [_media_response(m) for m in rows]
+
+
+@router.post("/media/{media_id}/index", response_model=schemas.MediaFileResponse)
+def index_media(
+    media_id: int,
+    req: schemas.MediaIndexRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    media = db.query(models.MediaFile).filter(models.MediaFile.id == media_id).first()
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+    if media.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Media not owned by user")
+    updated = crud.apply_media_index(db, media, req)
+    return _media_response(updated)
+
+
+@router.get("/devices/{device_id}/media/search", response_model=List[schemas.MediaFileResponse])
+def search_device_media(
+    device_id: int,
+    q: Optional[str] = None,
+    person_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
+    if not device:
+        raise HTTPException(status_code=403, detail="Device not owned by user")
+    rows = crud.search_media(db, device_id=device_id, q=q, person_id=person_id, skip=skip, limit=limit)
+    return [_media_response(m) for m in rows]
+
+
+@router.get("/devices/{device_id}/people/embeddings", response_model=List[schemas.FaceEmbeddingResponse])
+def list_person_embeddings(
+    device_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
+    if not device:
+        raise HTTPException(status_code=403, detail="Device not owned by user")
+    import base64
+    out = []
+    for face in crud.get_face_embeddings_for_device(db, device_id):
+        if not face.embedding or not face.person_id:
+            continue
+        out.append(
+            schemas.FaceEmbeddingResponse(
+                person_id=face.person_id,
+                face_id=face.id,
+                embedding_b64=base64.b64encode(face.embedding).decode("ascii"),
+            )
+        )
+    return out
+
+
+@router.get("/devices/{device_id}/people", response_model=List[schemas.PersonResponse])
+def list_people(
+    device_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
+    if not device:
+        raise HTTPException(status_code=403, detail="Device not owned by user")
+    people = crud.get_people_for_device(db, device_id)
+    result = []
+    for p in people:
+        cover = crud.get_person_cover_media(db, p)
+        cover_url = None
+        if cover:
+            cover_url = _media_response(cover).thumbnail_url
+        result.append(
+            schemas.PersonResponse(
+                id=p.id,
+                device_id=p.device_id,
+                name=p.name,
+                photo_count=crud.person_photo_count(db, p.id),
+                cover_url=cover_url,
+            )
+        )
+    return result
+
+
+@router.patch("/devices/{device_id}/people/{person_id}", response_model=schemas.PersonResponse)
+def rename_person(
+    device_id: int,
+    person_id: int,
+    req: schemas.PersonNameUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    device = crud.get_device_by_id_and_owner(db, device_id, current_user.id)
+    if not device:
+        raise HTTPException(status_code=403, detail="Device not owned by user")
+    person = (
+        db.query(models.Person)
+        .filter(models.Person.id == person_id, models.Person.device_id == device_id)
+        .first()
+    )
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    person = crud.rename_person(db, person, req.name)
+    cover = crud.get_person_cover_media(db, person)
+    cover_url = _media_response(cover).thumbnail_url if cover else None
+    return schemas.PersonResponse(
+        id=person.id,
+        device_id=person.device_id,
+        name=person.name,
+        photo_count=crud.person_photo_count(db, person.id),
+        cover_url=cover_url,
+    )
 
 @router.post("/media/presigned-put", response_model=schemas.PresignedPutResponse)
 def get_presigned_put(

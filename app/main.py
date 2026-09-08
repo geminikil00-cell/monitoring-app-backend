@@ -68,6 +68,43 @@ def startup_db():
                     "ALTER TABLE media_files ADD COLUMN IF NOT EXISTS owner_id INTEGER REFERENCES users(id)",
                     "ALTER TABLE media_files ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()",
                     "ALTER TABLE media_files ADD COLUMN IF NOT EXISTS captured_at BIGINT DEFAULT 0",
+                    "ALTER TABLE media_files ADD COLUMN IF NOT EXISTS indexed_at TIMESTAMPTZ",
+                    "ALTER TABLE media_files ADD COLUMN IF NOT EXISTS caption_en TEXT",
+                    "ALTER TABLE media_files ADD COLUMN IF NOT EXISTS caption_ar TEXT",
+                    "ALTER TABLE media_files ADD COLUMN IF NOT EXISTS index_error TEXT",
+                    "ALTER TABLE media_files ADD COLUMN IF NOT EXISTS index_attempts INTEGER DEFAULT 0",
+                    "UPDATE media_files SET index_attempts = 0 WHERE index_attempts IS NULL",
+                    "ALTER TABLE media_files ADD COLUMN IF NOT EXISTS search_text TEXT DEFAULT ''",
+                    """CREATE TABLE IF NOT EXISTS media_tags (
+                        id SERIAL PRIMARY KEY,
+                        media_id INTEGER REFERENCES media_files(id),
+                        tag_en VARCHAR,
+                        tag_ar VARCHAR,
+                        score FLOAT DEFAULT 0
+                    )""",
+                    """CREATE TABLE IF NOT EXISTS people (
+                        id SERIAL PRIMARY KEY,
+                        device_id INTEGER REFERENCES devices(id),
+                        owner_id INTEGER REFERENCES users(id),
+                        name VARCHAR,
+                        cover_face_id INTEGER,
+                        created_at TIMESTAMPTZ DEFAULT NOW()
+                    )""",
+                    """CREATE TABLE IF NOT EXISTS faces (
+                        id SERIAL PRIMARY KEY,
+                        media_id INTEGER REFERENCES media_files(id),
+                        person_id INTEGER REFERENCES people(id),
+                        bbox_x INTEGER DEFAULT 0,
+                        bbox_y INTEGER DEFAULT 0,
+                        bbox_w INTEGER DEFAULT 0,
+                        bbox_h INTEGER DEFAULT 0,
+                        embedding BYTEA,
+                        quality FLOAT DEFAULT 0
+                    )""",
+                    "CREATE INDEX IF NOT EXISTS ix_media_tags_media_id ON media_tags(media_id)",
+                    "CREATE INDEX IF NOT EXISTS ix_people_device_id ON people(device_id)",
+                    "CREATE INDEX IF NOT EXISTS ix_faces_media_id ON faces(media_id)",
+                    "CREATE INDEX IF NOT EXISTS ix_faces_person_id ON faces(person_id)",
                 ]
                 for m in migrations:
                     try:

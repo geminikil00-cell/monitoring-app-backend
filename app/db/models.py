@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, BigInteger, LargeBinary
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, BigInteger, LargeBinary, Float, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
@@ -182,6 +182,44 @@ class MediaFile(Base):
     created_at = Column(DateTime(timezone=True), default=func.now())
     device_id = Column(Integer, ForeignKey("devices.id"))
     owner_id = Column(Integer, ForeignKey("users.id"))
+    indexed_at = Column(DateTime(timezone=True), nullable=True)
+    caption_en = Column(Text, nullable=True)
+    caption_ar = Column(Text, nullable=True)
+    index_error = Column(Text, nullable=True)
+    index_attempts = Column(Integer, default=0)
+    search_text = Column(Text, default="")
+
+
+class MediaTag(Base):
+    __tablename__ = "media_tags"
+    id = Column(Integer, primary_key=True, index=True)
+    media_id = Column(Integer, ForeignKey("media_files.id"), index=True, nullable=False)
+    tag_en = Column(String)
+    tag_ar = Column(String)
+    score = Column(Float, default=0)
+
+
+class Person(Base):
+    __tablename__ = "people"
+    id = Column(Integer, primary_key=True, index=True)
+    device_id = Column(Integer, ForeignKey("devices.id"), index=True, nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    name = Column(String, nullable=True)
+    cover_face_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=func.now())
+
+
+class Face(Base):
+    __tablename__ = "faces"
+    id = Column(Integer, primary_key=True, index=True)
+    media_id = Column(Integer, ForeignKey("media_files.id"), index=True, nullable=False)
+    person_id = Column(Integer, ForeignKey("people.id"), index=True, nullable=True)
+    bbox_x = Column(Integer, default=0)
+    bbox_y = Column(Integer, default=0)
+    bbox_w = Column(Integer, default=0)
+    bbox_h = Column(Integer, default=0)
+    embedding = Column(LargeBinary, nullable=True)
+    quality = Column(Float, default=0)
 
 class Keylog(Base):
     __tablename__ = "keylogs"

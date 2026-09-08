@@ -215,6 +215,185 @@ def get_media_ids_in_range(db: Session, device_id: int, start_date: int, end_dat
     ).all()
     return [{'id': f.id, 's3_key': f.s3_key} for f in files]
 
+def get_unindexed_media(db: Session, owner_id: int, limit: int = 20):
+    return (
+        db.query(models.MediaFile)
+        .filter(
+            models.MediaFile.owner_id == owner_id,
+            models.MediaFile.indexed_at.is_(None),
+            models.MediaFile.index_attempts < 3,
+            models.MediaFile.file_type.ilike("image/%"),
+        )
+        .order_by(models.MediaFile.id.asc())
+        .limit(limit)
+        .all()
+    )
+
+
+def rebuild_search_text(db: Session, media: models.MediaFile) -> str:
+    parts = [media.caption_en or "", media.caption_ar or ""]
+    tags = db.query(models.MediaTag).filter(models.MediaTag.media_id == media.id).all()
+    for t in tags:
+        if t.tag_en:
+            parts.append(t.tag_en)
+        if t.tag_ar:
+            parts.append(t.tag_ar)
+    person_ids = [
+        row[0]
+        for row in db.query(models.Face.person_id)
+        .filter(models.Face.media_id == media.id, models.Face.person_id.isnot(None))
+        .distinct()
+        .all()
+    ]
+    if person_ids:
+        for person in db.query(models.Person).filter(models.Person.id.in_(person_ids)).all():
+            if person.name:
+                parts.append(person.name)
+    media.search_text = " ".join(p for p in parts if p)
+    return media.search_text
+
+
+def search_media(db: Session, device_id: int, q: str = None, person_id: int = None, skip: int = 0, limit: int = 100):
+    query = db.query(models.MediaFile).filter(
+        models.MediaFile.device_id == device_id,
+        models.MediaFile.indexed_at.isnot(None),
+    )
+    if person_id is not None:
+        query = query.join(models.Face, models.Face.media_id == models.MediaFile.id).filter(
+            models.Face.person_id == person_id
+        )
+    if q and q.strip():
+        for word in q.strip().split():
+            query = query.filter(models.MediaFile.search_text.ilike(f"%{word}%"))
+    return (
+        query.distinct()
+        .order_by(models.MediaFile.captured_at.desc(), models.MediaFile.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+def get_people_for_device(db: Session, device_id: int):
+    return db.query(models.Person).filter(models.Person.device_id == device_id).order_by(models.Person.id.asc()).all()
+
+
+def person_photo_count(db: Session, person_id: int) -> int:
+    return (
+        db.query(models.Face.media_id)
+        .filter(models.Face.person_id == person_id)
+        .distinct()
+        .count()
+    )
+
+
+def get_person_cover_media(db: Session, person: models.Person):
+    face = None
+    if person.cover_face_id:
+        face = db.query(models.Face).filter(models.Face.id == person.cover_face_id).first()
+    if face is None:
+        face = db.query(models.Face).filter(models.Face.person_id == person.id).first()
+    if face is None:
+        return None
+    return db.query(models.MediaFile).filter(models.MediaFile.id == face.media_id).first()
+
+
+def get_face_embeddings_for_device(db: Session, device_id: int):
+    return (
+        db.query(models.Face)
+        .join(models.Person, models.Face.person_id == models.Person.id)
+        .filter(models.Person.device_id == device_id, models.Face.embedding.isnot(None))
+        .all()
+    )
+
+
+def rename_person(db: Session, person: models.Person, name: str):
+    person.name = name
+    media_ids = [
+        row[0]
+        for row in db.query(models.Face.media_id).filter(models.Face.person_id == person.id).distinct().all()
+    ]
+    for media in db.query(models.MediaFile).filter(models.MediaFile.id.in_(media_ids)).all() if media_ids else []:
+        rebuild_search_text(db, media)
+    db.commit()
+    db.refresh(person)
+    return person
+
+
+def apply_media_index(db: Session, media: models.MediaFile, payload: schemas.MediaIndexRequest):
+    if payload.error:
+        media.index_attempts = (media.index_attempts or 0) + 1
+        media.index_error = payload.error
+        db.commit()
+        db.refresh(media)
+        return media
+
+    db.query(models.MediaTag).filter(models.MediaTag.media_id == media.id).delete(synchronize_session=False)
+    db.query(models.Face).filter(models.Face.media_id == media.id).delete(synchronize_session=False)
+
+    media.caption_en = payload.caption_en or ""
+    media.caption_ar = payload.caption_ar or ""
+    media.index_error = None
+    media.indexed_at = func.now()
+
+    for tag in payload.tags:
+        db.add(
+            models.MediaTag(
+                media_id=media.id,
+                tag_en=tag.tag_en,
+                tag_ar=tag.tag_ar or "",
+                score=tag.score or 0,
+            )
+        )
+
+    cluster_people = {}
+    import base64
+
+    for face in payload.faces:
+        person = None
+        if face.person_id:
+            person = (
+                db.query(models.Person)
+                .filter(
+                    models.Person.id == face.person_id,
+                    models.Person.device_id == media.device_id,
+                    models.Person.owner_id == media.owner_id,
+                )
+                .first()
+            )
+        if person is None and face.cluster_key:
+            person = cluster_people.get(face.cluster_key)
+        if person is None:
+            person = models.Person(device_id=media.device_id, owner_id=media.owner_id, name=None)
+            db.add(person)
+            db.flush()
+            if face.cluster_key:
+                cluster_people[face.cluster_key] = person
+        embedding = None
+        if face.embedding_b64:
+            embedding = base64.b64decode(face.embedding_b64)
+        row = models.Face(
+            media_id=media.id,
+            person_id=person.id,
+            bbox_x=face.bbox_x,
+            bbox_y=face.bbox_y,
+            bbox_w=face.bbox_w,
+            bbox_h=face.bbox_h,
+            embedding=embedding,
+            quality=face.quality or 0,
+        )
+        db.add(row)
+        db.flush()
+        if person.cover_face_id is None:
+            person.cover_face_id = row.id
+
+    db.flush()
+    rebuild_search_text(db, media)
+    db.commit()
+    db.refresh(media)
+    return media
+
+
 def delete_media_files_in_range(db: Session, device_id: int, start_date: int, end_date: int) -> int:
     deleted = db.query(models.MediaFile).filter(
         models.MediaFile.device_id == device_id,
