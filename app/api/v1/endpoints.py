@@ -318,8 +318,17 @@ def list_unindexed_media(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    rows = crud.get_unindexed_media(db, owner_id=current_user.id, limit=min(limit, 100))
-    return [_media_response(m) for m in rows]
+    rows = crud.get_unindexed_media(db, owner_id=current_user.id, limit=min(limit, 20))
+    out = []
+    for m in rows:
+        item = _media_response(m)
+        # Worker must download from R2, not through this API, or phone uploads stall.
+        direct = r2_service.generate_presigned_get(m.thumbnail_key or m.s3_key) or r2_service.generate_presigned_get(m.s3_key)
+        if direct:
+            item.thumbnail_url = direct
+            item.url = direct
+        out.append(item)
+    return out
 
 
 @router.post("/media/{media_id}/index", response_model=schemas.MediaFileResponse)

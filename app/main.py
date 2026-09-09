@@ -105,6 +105,7 @@ def startup_db():
                     "CREATE INDEX IF NOT EXISTS ix_people_device_id ON people(device_id)",
                     "CREATE INDEX IF NOT EXISTS ix_faces_media_id ON faces(media_id)",
                     "CREATE INDEX IF NOT EXISTS ix_faces_person_id ON faces(person_id)",
+                    "CREATE INDEX IF NOT EXISTS ix_media_files_unindexed ON media_files (owner_id) WHERE indexed_at IS NULL",
                 ]
                 for m in migrations:
                     try:
